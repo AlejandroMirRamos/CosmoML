@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Read(//home/aleja/**)",
+      "Bash(pip3 list *)",
+      "Bash(apt list *)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pip uninstall *)",
+      "Bash(.venv/bin/jupyter execute *)",
+      "Bash(mv 3_5_dataset.csv BAO_H0rd_sinrodajas.csv)",
+      "Bash(mv BAO_H0rd_v2.csv 3_5_dataset.csv)",
+      "Bash(rm -f /home/aleja/ComoML/outputs/models/3_5_model.ubj /home/aleja/ComoML/outputs/models/3_5_model.info.pkl)",
+      "Bash(ls /home/aleja/ComoML/outputs/models/)",
+      "Bash(zcat /home/aleja/ComoML/data/des/STAT+SYS_2024.txt.gz)",
+      "Bash(mv FlatCDM_Pantheon.csv 1_1_dataset.csv)",
+      "Bash(mv LambdaCDM_OmegaL_Pantheon.csv 1_2_dataset.csv)",
+      "Bash(mv FlatCDM_Mvar_Pantheon.csv 1_3_dataset.csv)",
+      "Bash(mv FlatCDM_alphabeta_Pantheon.csv 1_4_dataset.csv)",
+      "Bash(mv wCDM_Pantheon.csv 1_5_dataset.csv)",
+      "Bash(python -c ' *)",
+      "Bash(set -e)",
+      "Bash(mkdir -p /home/aleja/PhysicsML)",
+      "Bash(mv /home/aleja/CosmoML /home/aleja/PhysicsML/CosmoML)",
+      "Bash(mv /home/aleja/AlpsML /home/aleja/PhysicsML/AlpsML)",
+      "Bash(mkdir -p /home/aleja/PhysicsML/PhysicsML-index)"
+    ]
+  }
+}

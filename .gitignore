@@ -1,0 +1,29 @@
+# Outputs regenerables
+outputs/datasets/*.csv
+outputs/figures/**/*.png
+outputs/models/*.json
+outputs/models/*.bin
+outputs/models/*.ubj   
+*.ubj
+*.pkl
+# Notebooks ejecutados
+**/.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.txt
+*.cov
+*.dat
+*.csv
+*.zip
+*.gz
+*.npz
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Carpetas que no quiero subir
+legacy/

@@ -7,6 +7,7 @@ from .curve import plot_learning_curve
 from .shap_utils import (
     explain, shap_summary, shap_waterfall, shap_dependence_all, shap_dependence,
 )
+from .marginal import plot_corner_marginal
 
 
 def use_paper_style() -> None:
@@ -21,5 +22,6 @@ __all__ = [
     "plot_learning_curve",
     "explain", "shap_summary", "shap_waterfall", "shap_dependence_all",
     "shap_dependence",
+    "plot_corner_marginal",
     "use_paper_style",
 ]

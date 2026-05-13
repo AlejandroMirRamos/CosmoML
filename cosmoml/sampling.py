@@ -1,9 +1,12 @@
-"""Generador de datasets χ² para entrenar XGBoost.
+"""Chi-squared dataset builder for XGBoost training.
 
-Patrón estándar usado en todos los escenarios:
-  1. Rodajas: una dimensión fija + el resto aleatorio (varios planos).
-  2. Nube random: todas las dimensiones aleatorias en rangos amplios.
-  3. Anclaje: el best-fit repetido N veces para "dopar" el modelo.
+Generates a DataFrame of (parameters..., chi2) tuples by sampling the parameter
+space, then evaluating chi2 in parallel. The sampling pattern combines:
+
+    1. Slices: fix one or more dimensions to a constant (typically REF) and
+       sample the rest uniformly. Provides dense coverage along 2D projections.
+    2. Random box: sample all dimensions uniformly across a wider region.
+    3. Anchor: optionally repeat the best-fit point n_anchor times.
 """
 from __future__ import annotations
 from collections.abc import Callable
@@ -14,9 +17,10 @@ import pandas as pd
 import concurrent.futures
 import multiprocessing
 
+
 def _sample_uniform(spec: dict[str, tuple[float, float] | float], n: int,
                     rng: np.random.Generator) -> dict[str, np.ndarray]:
-    """spec: {param: (low, high) | valor_fijo}. Devuelve dict de arrays len=n."""
+    """Sample `n` rows per key. Tuple values → uniform draw; scalars → constant."""
     out = {}
     for k, v in spec.items():
         if isinstance(v, tuple):
@@ -26,17 +30,12 @@ def _sample_uniform(spec: dict[str, tuple[float, float] | float], n: int,
     return out
 
 
-# -------------------------------------------------------------------
-# FUNCIÓN AUXILIAR (Debe ir FUERA para que Python pueda paralelizarla)
-# -------------------------------------------------------------------
+# Module-level so ProcessPoolExecutor can pickle it.
 def _chi2_worker(task):
-    """Desempaqueta la función y los argumentos y los evalúa."""
     func, kwargs = task
     return func(**kwargs)
 
-# -------------------------------------------------------------------
-# TU FUNCIÓN PRINCIPAL ACTUALIZADA
-# -------------------------------------------------------------------
+
 def build_chi2_dataset(
     chi2_fn: Callable[..., float],
     param_names: list[str],
@@ -48,70 +47,78 @@ def build_chi2_dataset(
     n_anchor: int = 0,
     seed: int = 0,
     save_to: str | Path | None = None,
-    progress_every: int = 5000, # Nota: en paralelo no usaremos esto, será todo de golpe
+    progress_every: int = 2000,
 ) -> pd.DataFrame:
-    """Construye un DataFrame (params..., chi2).
+    """Build a (params..., chi2) DataFrame via parallel chi2 evaluation.
 
     Parameters
     ----------
     chi2_fn : callable
-        Función que recibe **kwargs con los param_names y devuelve χ².
+        Receives kwargs matching `param_names` and returns chi2. Must be
+        picklable (module-level function or notebook-cell closure over picklable
+        data; lambdas are NOT picklable).
     param_names : list[str]
-        Orden de columnas en el DataFrame de salida.
+        Output column order.
     slices : list[dict]
-        Cada dict tiene {param: (low, high) | valor_fijo, '_n': N}. Genera N puntos.
+        Each dict: ``{param: (low, high) | constant, '_n': N}``. Produces N
+        rows per slice.
     random_box : dict
-        {param: (low, high)} para la nube aleatoria N-dim.
+        ``{param: (low, high)}`` for the N-dim random cloud.
     n_random : int
-        Tamaño de la nube aleatoria.
+        Cloud size.
     anchor : dict
-        {param: valor_fijo} del best-fit a repetir n_anchor veces.
-    n_anchor : int
-        Veces que se repite el ancla (0 lo desactiva).
+        ``{param: constant}`` for the best-fit row, repeated `n_anchor` times.
+    seed : int
+        RNG seed.
     save_to : str | Path
-        Si se pasa, escribe el CSV resultante.
+        Optional CSV output path.
+    progress_every : int
+        Print progress (elapsed time, ETA, throughput) every N completed points.
+        Set to 0 to disable.
     """
     rng = np.random.default_rng(seed)
     blocks: list[dict[str, np.ndarray]] = []
 
-    # 1. Rodajas
     for sp in slices or []:
         n = int(sp.pop("_n"))
         blocks.append(_sample_uniform(sp, n, rng))
 
-    # 2. Nube random
     if random_box is not None and n_random > 0:
         blocks.append(_sample_uniform(random_box, n_random, rng))
 
-    # Concatenar
     samples = {p: np.concatenate([b[p] for b in blocks]) for p in param_names}
     total = len(next(iter(samples.values())))
-    print(f"Calculando χ² para {total} puntos (en paralelo)...")
 
-    # --- INICIO DEL BLOQUE PARALELO ---
-    t0 = time.time()
-    
-    # Preparamos las tareas: una tupla con (tu_funcion, diccionario_de_parametros)
-    tasks = [(chi2_fn, {p: float(samples[p][i]) for p in param_names}) for i in range(total)]
-    
-    # Dejamos 1 núcleo libre para no colapsar el ordenador
     n_cores = max(1, multiprocessing.cpu_count() - 1)
-    
+    print(f"Evaluating chi2 at {total} points across {n_cores} cores...")
+
+    tasks = [(chi2_fn, {p: float(samples[p][i]) for p in param_names})
+             for i in range(total)]
+
+    chi2s = np.empty(total)
+    t0 = time.time()
+    last_report = 0
     with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as executor:
-        # chunksize=100 envía las integrales en paquetes de 100 a cada núcleo
-        results = list(executor.map(_chi2_worker, tasks, chunksize=100))
-        
-    chi2s = np.array(results)
-    print(f"  → terminado en {time.time()-t0:.1f}s")
-    # --- FIN DEL BLOQUE PARALELO ---
+        # executor.map preserves submission order, so the index i matches tasks[i]
+        for i, val in enumerate(executor.map(_chi2_worker, tasks, chunksize=100)):
+            chi2s[i] = val
+            done = i + 1
+            if progress_every and done - last_report >= progress_every:
+                elapsed = time.time() - t0
+                rate = done / elapsed if elapsed > 0 else 0.0
+                eta = (total - done) / rate if rate > 0 else 0.0
+                print(f"  {done:>7d}/{total} ({100*done/total:5.1f}%) | "
+                      f"elapsed {elapsed:6.1f}s | ETA {eta:6.1f}s | "
+                      f"{rate:6.0f} pts/s")
+                last_report = done
+    print(f"  done in {time.time() - t0:.1f}s")
 
     df = pd.DataFrame({**samples, "chi2": chi2s})
 
-    # 3. Anclaje (Se mantiene exactamente igual que lo tenías)
     if anchor is not None and n_anchor > 0:
         kwargs = {p: float(anchor[p]) for p in param_names}
         chi2_anchor = float(chi2_fn(**kwargs))
-        print(f"  ancla {anchor} → χ²={chi2_anchor:.3f} repetida {n_anchor}×")
+        print(f"  anchor {anchor} -> chi2={chi2_anchor:.3f} repeated {n_anchor}x")
         anchor_rows = pd.DataFrame({
             **{p: [anchor[p]] * n_anchor for p in param_names},
             "chi2": [chi2_anchor] * n_anchor,
@@ -124,20 +131,20 @@ def build_chi2_dataset(
         save_to = Path(save_to)
         save_to.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(save_to, index=False)
-        print(f"  guardado: {save_to}  ({len(df)} filas)")
+        print(f"  saved: {save_to} ({len(df)} rows)")
 
     return df
+
 
 def load_or_build(
     csv_path: str | Path,
     builder: Callable[[], pd.DataFrame],
     force: bool = False,
 ) -> pd.DataFrame:
-    """Si existe el CSV lo carga; si no (o force=True) lo construye."""
+    """Load `csv_path` if it exists (and not `force`); otherwise call `builder()`."""
     csv_path = Path(csv_path)
     if csv_path.exists() and not force:
-        print(f"Cargando dataset existente: {csv_path}")
+        print(f"Loading cached dataset: {csv_path}")
         return pd.read_csv(csv_path)
-    print(f"Generando dataset (no existe {csv_path})...")
-    df = builder()
-    return df
+    print(f"Building dataset (cache missing: {csv_path})")
+    return builder()

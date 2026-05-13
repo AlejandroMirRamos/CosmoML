@@ -1,12 +1,9 @@
-"""χ² para supernovas tipo Ia con calibración Cepheid (Pantheon+SH0ES).
+"""Type Ia supernovae chi2 with Cepheid calibration (Pantheon+SH0ES).
 
-Soporta:
-- FlatLambdaCDM, FlatwCDM, Flatw0waCDM (vía astropy.cosmology)
-- M absoluta marginalizada analíticamente (por defecto) o pasada explícita
-- Corrección α/β opcional (mb_corr += (α-α₀) x1 - (β-β₀) c)
-
-Cálculo riguroso: una llamada a astropy por punto, sin cachés cruzados —
-la comparación ML vs teoría en los notebooks debe ser justa.
+Supports:
+  - FlatLambdaCDM, LambdaCDM, FlatwCDM, Flatw0waCDM (via astropy.cosmology).
+  - Absolute magnitude M analytically marginalized (default) or passed explicitly.
+  - Optional SALT2 alpha/beta correction (mb_corr += (alpha-alpha0)*x1 - (beta-beta0)*c).
 """
 from __future__ import annotations
 from typing import Literal
@@ -28,15 +25,15 @@ def _build_cosmo(model: str, H0: float, Om: float,
                  Ode: float | None = None):
     if model == "FlatLambdaCDM":
         return FlatLambdaCDM(H0=H0, Om0=Om)
-    if model == "LambdaCDM":  # no plano: Ode libre
+    if model == "LambdaCDM":
         if Ode is None:
-            raise ValueError("LambdaCDM requiere Ode")
+            raise ValueError("LambdaCDM requires Ode")
         return LambdaCDM(H0=H0, Om0=Om, Ode0=Ode)
     if model == "FlatwCDM":
         return FlatwCDM(H0=H0, Om0=Om, w0=w0)
     if model == "Flatw0waCDM":
         return Flatw0waCDM(H0=H0, Om0=Om, w0=w0, wa=wa)
-    raise ValueError(f"Modelo no reconocido: {model}")
+    raise ValueError(f"Unknown model: {model}")
 
 
 def mu_theory_sne(
@@ -49,16 +46,19 @@ def mu_theory_sne(
     use_cepheid_calibrators: bool = True,
     use_zhel_correction: bool = True,
 ) -> np.ndarray:
-    """μ teórica por SNe.
+    """Theoretical distance modulus per SN.
 
     Parameters
     ----------
     use_cepheid_calibrators : bool
-        True (default): los calibradores reciben CEPH_DIST y el resto recibe el modelo.
-        False: TODOS los puntos reciben μ del modelo (equivale al modo "Pantheon
-        plano sin SH0ES" usado en el script original FlatCDM_generator.py).
+        If True (default), calibrators receive ``CEPH_DIST`` and the rest get
+        the cosmological model.
+        If False, ALL points receive the model (no SH0ES).
     use_zhel_correction : bool
-        True (default): se aplica dl·(1+z_hel)/(1+z_hd). False: se usa dl directamente.
+        If True (default), apply ``dl * (1 + z_hel) / (1 + z_hd)``.
+
+    Returns ``None`` if the input is unphysical or astropy produces non-finite
+    luminosity distances (caller treats this as a chi2 failure sentinel).
     """
     if Om <= 0 or H0 <= 0:
         return None
@@ -71,8 +71,8 @@ def mu_theory_sne(
     if np.any(flow):
         cosmo = _build_cosmo(model, H0, Om, w0, wa, Ode)
         dl = cosmo.luminosity_distance(data.z_hd[flow]).value
-        # Cosmologías no físicas (e.g. LambdaCDM con Ω_m≈0 y Ω_Λ alto) producen
-        # NaN/inf en astropy sin lanzar excepción. Marca como inválido.
+        # Non-physical cosmologies (e.g. LambdaCDM with Om~0 and Ode>>1) can
+        # produce NaN/inf without raising; treat as invalid.
         if not np.all(np.isfinite(dl)):
             return None
         dl[dl <= 0] = 1e-10
@@ -96,23 +96,25 @@ def chi2_sne(
     use_cepheid_calibrators: bool = True,
     use_zhel_correction: bool = True,
 ) -> float:
-    """χ² SNe Pantheon+ con cov completa.
+    """Pantheon+ chi2 with full STAT+SYS covariance.
 
-    M
-        - "marginalize" (default): se marginaliza analíticamente
-          (m_best = sum(C⁻¹ Δ) / sum(C⁻¹)).
-        - float: se usa ese valor explícito (escenario M variable o calibrado).
-    alpha, beta
-        Si se pasan ambos, se aplica la corrección α/β (requiere include_x1c=True).
+    Parameters
+    ----------
+    M : float | "marginalize"
+        - "marginalize" (default): analytic marginalization,
+          ``m_best = sum(C^-1 . delta) / sum(C^-1)``.
+        - float: use the given M (e.g. for the M-free scenario).
+    alpha, beta : float | None
+        If both are given, apply the SALT2 correction. Requires
+        ``include_x1c=True`` when loading Pantheon.
     use_cepheid_calibrators, use_zhel_correction
-        Ver mu_theory_sne. Para reproducir el FlatCDM "simple" del script original
-        usa False en ambos junto con M=-19.23904 y carga Pantheon con apply_mask=False.
+        See ``mu_theory_sne``.
     """
     try:
         mb = data.mb.copy()
         if alpha is not None and beta is not None:
             if data.x1 is None or data.c is None:
-                raise ValueError("alpha/beta requieren cargar Pantheon con include_x1c=True")
+                raise ValueError("alpha/beta require include_x1c=True when loading Pantheon")
             mb = mb + (alpha - fid_alpha) * data.x1 - (beta - fid_beta) * data.c
 
         mu = mu_theory_sne(
@@ -141,19 +143,17 @@ def chi2_sne_des(
     Om: float, H0: float = 70.0,
     w0: float = -1.0, wa: float = 0.0, Ode: float | None = None,
 ) -> float:
-    """χ² SNe DES SN5YR con marginalización analítica de la M absoluta.
+    """DES SN5YR chi2 with analytic marginalization of the absolute magnitude offset.
 
-    Diferencias con `chi2_sne`:
-    - DES no incluye Cefeidas (no hay calibradores externos en el Hubble Diagram).
-    - El Hubble Diagram ya contiene `μ` directamente (no `m_b`), así que no hay
-      que añadir el término M; la marginalización se hace SOBRE el offset entre
-      μ_modelo y μ_observado.
-    - Marginalización analítica idéntica al script DES oficial:
-        χ² = Σ Δ·C⁻¹·Δ  -  (Σ C⁻¹·Δ)² / (Σ C⁻¹)  +  log(Σ C⁻¹ / 2π)
-      (el último término es el Jacobiano de la marginalización; constante).
+    Differences with ``chi2_sne``:
+      - DES has no Cepheid calibrators (no external anchor in the HD).
+      - The HD already provides ``mu`` directly, so there is no separate M term;
+        the marginalization acts on the offset between model and observed mu.
+      - Analytic marginalization:
+            chi2 = sum(d . C^-1 . d) - (sum(C^-1 . d))^2 / sum(C^-1)
+                   + log(sum(C^-1) / (2 pi))
 
-    Modelo soporta `FlatLambdaCDM`, `FlatwCDM`, `Flatw0waCDM` (no LambdaCDM
-    no-plana — DES sólo se usa con cosmologías planas en el paper).
+    Only flat cosmologies are supported (DES paper convention).
     """
     if Om <= 0 or H0 <= 0:
         return _CHI2_BAD
@@ -162,7 +162,7 @@ def chi2_sne_des(
         da = cosmo.angular_diameter_distance(data.z).value
         if np.any(da <= 0) or not np.all(np.isfinite(da)):
             return _CHI2_BAD
-        # μ = 5·log10[(1+zHD)·(1+zHEL)·DA] + 25  (relación distancia-luminosidad)
+        # mu = 5 * log10[(1 + zHD) * (1 + zHEL) * D_A] + 25
         mu_model = 5.0 * np.log10((1.0 + data.z) * (1.0 + data.z_hel) * da) + 25.0
         delta = mu_model - data.mu
         chit2 = float(delta @ data.inv_cov @ delta)
@@ -171,4 +171,3 @@ def chi2_sne_des(
         return chit2 - (B * B / C) + float(np.log(C / (2.0 * np.pi)))
     except Exception:
         return _CHI2_BAD
-

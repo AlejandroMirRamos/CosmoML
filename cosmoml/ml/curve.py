@@ -1,4 +1,4 @@
-"""Curva de aprendizaje (train + val por iteración)."""
+"""Learning curve plot (train + validation metric vs boosting iteration)."""
 from __future__ import annotations
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -8,25 +8,25 @@ def plot_learning_curve(
     info: dict,
     *,
     save_path: str | Path | None = None,
-    title: str = "Curva de aprendizaje",
+    title: str = "Learning curve",
     yscale: str = "log",
     figsize: tuple[float, float] = (9, 4.5),
     show: bool = False,
 ):
-    """Dibuja la métrica de eval vs iteración para train y val.
+    """Plot the evaluation metric per iteration for both train and validation.
 
-    `info` es el dict que devuelve `train_xgb` (debe contener 'eval_results',
-    'eval_metric', 'best_iteration').
+    `info` is the dict returned by ``train_xgb`` (must contain ``eval_results``,
+    ``eval_metric`` and ``best_iteration``).
     """
     eval_results = info["eval_results"]
     metric = info.get("eval_metric", "rmse")
     best_iter = info.get("best_iteration", None)
 
-    # XGBoost nombra los eval_set como validation_0, validation_1, ...
+    # XGBoost names eval_set entries validation_0, validation_1, ...
     keys = list(eval_results.keys())
     if len(keys) < 2:
         raise ValueError(
-            "eval_results sólo tiene un eval_set; pasa eval_set=[(train),(val)] en train_xgb"
+            "eval_results only has one eval_set; pass eval_set=[(train),(val)] to train_xgb"
         )
     train_curve = eval_results[keys[0]][metric]
     val_curve = eval_results[keys[1]][metric]
@@ -41,7 +41,7 @@ def plot_learning_curve(
 
     if yscale:
         ax.set_yscale(yscale)
-    ax.set_xlabel("Iteración (boosting round)")
+    ax.set_xlabel("Boosting iteration")
     ax.set_ylabel(metric.upper())
     ax.set_title(title)
     ax.grid(True, which="both", ls=":", alpha=0.5)
@@ -52,7 +52,7 @@ def plot_learning_curve(
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=300)
-        print(f"  guardado: {save_path}")
+        print(f"  saved: {save_path}")
     if show:
         plt.show()
     else:

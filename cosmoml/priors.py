@@ -1,4 +1,4 @@
-"""Priors gaussianos (Planck 2018)."""
+"""Gaussian priors (Planck 2018)."""
 from .config import (
     PLANCK_H0, PLANCK_H0_ERR,
     PLANCK_OM, PLANCK_OM_ERR,
@@ -7,7 +7,7 @@ from .config import (
 
 
 def gaussian_prior(value: float, mean: float, sigma: float) -> float:
-    """Devuelve ((value-mean)/sigma)² (contribución al χ²)."""
+    """Return ((value - mean) / sigma)**2, the chi2 contribution of a Gaussian prior."""
     return ((value - mean) / sigma) ** 2
 
 
@@ -19,7 +19,7 @@ PLANCK_PRIORS = {
 
 
 def planck_prior_chi2(*, H0=None, Om=None, rd=None) -> float:
-    """Suma los priors Planck para los parámetros que pases (None = no aplicar)."""
+    """Sum of Planck Gaussian priors for the parameters that are not None."""
     chi2 = 0.0
     if H0 is not None:
         chi2 += gaussian_prior(H0, *PLANCK_PRIORS["H0"])

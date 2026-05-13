@@ -4,6 +4,16 @@ Análisis ML (XGBoost + SHAP) de likelihoods cosmológicos: supernovas Ia
 (Pantheon+SH0ES, DES-SN5YR 2024/2025) y BAO (DESI DR2), en distintos modelos
 (ΛCDM, wCDM, w₀wₐCDM) y combinaciones (SNe + BAO).
 
+## Notebooks
+
+| # | Notebook | Escenarios |
+|---|---|---|
+| 01 | [SNe Pantheon+SH0ES](notebooks/01_SN_Panth+.ipynb) | [1.1 FlatLCDM 2D](notebooks/01_SN_Panth+.ipynb#1-1) · [1.2 Non-flat ΛCDM 3D](notebooks/01_SN_Panth+.ipynb#1-2) · [1.3 FlatLCDM+M 3D](notebooks/01_SN_Panth+.ipynb#1-3) · [1.4 SALT2 α/β 4D](notebooks/01_SN_Panth+.ipynb#1-4) · [1.5 wCDM 3D](notebooks/01_SN_Panth+.ipynb#1-5) · [1.6 w₀wₐCDM+SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-6) · [1.7 w₀wₐCDM sin SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-7) · [1.8 w₀wₐCDM z>0.25 4D](notebooks/01_SN_Panth+.ipynb#1-8) |
+| 02 | [SNe DES SN5YR](notebooks/02_SN_DES.ipynb) | [2.1 wCDM DES2024 2D](notebooks/02_SN_DES.ipynb#2-1) · [2.2 wCDM DES2025 2D](notebooks/02_SN_DES.ipynb#2-2) · [2.3 w₀wₐCDM DES2024 3D](notebooks/02_SN_DES.ipynb#2-3) · [2.4 w₀wₐCDM DES2025 3D](notebooks/02_SN_DES.ipynb#2-4) |
+| 03 | [BAO DESI DR2](notebooks/03_BAO.ipynb) | [3.1 wCDM 2D](notebooks/03_BAO.ipynb#3-1) · [3.2 wCDM+H0 3D](notebooks/03_BAO.ipynb#3-2) · [3.3 w₀wₐCDM full 3D](notebooks/03_BAO.ipynb#3-3) · [3.4 w₀wₐCDM z<2 3D](notebooks/03_BAO.ipynb#3-4) · [3.5 w₀wₐCDM+rd Planck 4D](notebooks/03_BAO.ipynb#3-5) · [3.6 H0·rd 4D](notebooks/03_BAO.ipynb#3-6) · [3.7 H0–rd degeneracy 5D](notebooks/03_BAO.ipynb#3-7) · [3.8 +priors Om/H0/rd 5D](notebooks/03_BAO.ipynb#3-8) · [3.9 +5 Planck priors 5D](notebooks/03_BAO.ipynb#3-9) |
+| 04 | [Joint SNe + BAO](notebooks/04_SN+BAO.ipynb) | [4.1 Joint w₀wₐCDM 4D](notebooks/04_SN+BAO.ipynb#4-1) · [4.2 SNe vs BAO Ωm=0.40 prior](notebooks/04_SN+BAO.ipynb#4-2) · [4.3 w₀–wₐ overlay ellipses](notebooks/04_SN+BAO.ipynb#4-3) · [4.4 1D constraint wₐ](notebooks/04_SN+BAO.ipynb#4-4) |
+| 05 | [Figuras para el paper](notebooks/05_Figures.ipynb) | [5.1 Fig 8 — ΛCDM BAO (Ωm, H0·rd)](notebooks/05_Figures.ipynb#5-1) · [5.2 Fig 12 — wCDM overlay 3 datasets](notebooks/05_Figures.ipynb#5-2) · [5.3 Fig 13 — μ(z) residuals](notebooks/05_Figures.ipynb#5-3) |
+
 ## Estructura
 
 ```

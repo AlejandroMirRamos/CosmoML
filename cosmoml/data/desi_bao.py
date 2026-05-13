@@ -8,8 +8,8 @@ from ..config import DATA_DIR
 
 @dataclass
 class DesiBaoData:
-    z: np.ndarray            # redshift de cada medida
-    val: np.ndarray          # valor observado (DM/rs, DH/rs o DV/rs)
+    z: np.ndarray            # redshift of each measurement
+    val: np.ndarray          # observed value (DM/rs, DH/rs or DV/rs)
     type: np.ndarray         # 'DM_over_rs' | 'DH_over_rs' | 'DV_over_rs'
     unique_z: np.ndarray
     cov: np.ndarray
@@ -20,15 +20,14 @@ class DesiBaoData:
 
 
 def load_desi_bao(z_max: float | None = None) -> DesiBaoData:
-    """Carga DESI BAO DR2.
+    """Load DESI BAO DR2.
 
     Parameters
     ----------
     z_max : float | None
-        Si se pasa, descarta medidas con z >= z_max y recorta la covarianza
-        ANTES de invertirla (importante para mantener la coherencia entre
-        índices de medidas y covarianza). Útil para escenarios z<2 que
-        excluyen Lyman-α.
+        If given, drop measurements with ``z >= z_max`` and crop the covariance
+        BEFORE inverting. Useful for scenarios that exclude the Lyman-alpha
+        bin (e.g. z < 2).
     """
     mean_path = DATA_DIR / "desi_bao" / "desi_gaussian_bao_ALL_GCcomb_mean.txt"
     cov_path = DATA_DIR / "desi_bao" / "desi_gaussian_bao_ALL_GCcomb_cov.txt"

@@ -1,7 +1,7 @@
 """Pantheon+SH0ES loader.
 
-Devuelve un objeto con z_hd, z_hel, mb, is_calib, ceph_dist, cov, inv_cov, sum_inv_cov,
-ya con la mask estándar (zHD>0.01 o calibrador) aplicada.
+Returns a PantheonData with z_hd, z_hel, mb, is_calib, ceph_dist, cov, inv_cov,
+sum_inv_cov. By default applies the standard mask (zHD > 0.01 OR is_calibrator).
 """
 from dataclasses import dataclass
 import numpy as np
@@ -33,23 +33,22 @@ def load_pantheon_plus(
     keep_calibrators: bool = True,
     include_x1c: bool = False,
 ) -> PantheonData:
-    """Carga Pantheon+SH0ES.
+    """Load Pantheon+SH0ES.
 
     Parameters
     ----------
     apply_mask : bool
-        Si True aplica una mask sobre las filas. El comportamiento depende de
+        If True, restrict rows to the standard mask. Behavior depends on
         `keep_calibrators`.
     z_min : float
-        Umbral para el corte de redshift bajo.
+        Low-redshift cutoff.
     keep_calibrators : bool
-        - True (default): mask = (zHD > z_min) | IS_CALIBRATOR. Los calibradores
-          Cefeidas se mantienen aunque tengan z<z_min — escenario "con SH0ES".
-        - False: mask = (zHD > z_min) sólo. Los calibradores se descartan junto
-          con el resto. Útil para los escenarios "sin SH0ES" (e.g. corte
-          agresivo z>0.25, sin Cefeidas).
+        - True (default): ``mask = (zHD > z_min) | IS_CALIBRATOR``. Cepheid
+          calibrators are kept even at low z (the SH0ES setup).
+        - False: ``mask = (zHD > z_min)`` only. Calibrators are dropped (the
+          no-SH0ES setup, e.g. aggressive z > 0.25 cut).
     include_x1c : bool
-        Si True devuelve también x1 y c (necesario para análisis α/β).
+        If True, also load `x1` and `c` columns (needed for alpha/beta analyses).
     """
     dat_path = DATA_DIR / "pantheon" / "Pantheon+SH0ES.dat"
     cov_path = DATA_DIR / "pantheon" / "Pantheon+SH0ES_STAT+SYS.cov"

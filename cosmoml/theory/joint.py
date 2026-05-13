@@ -1,4 +1,4 @@
-"""χ² conjunto SNe + BAO."""
+"""Joint SNe + BAO chi2."""
 from .sne import chi2_sne
 from .bao import chi2_bao
 from ..data.pantheon import PantheonData
@@ -13,14 +13,14 @@ def chi2_joint(
     rd: float | None = None,
     sne_kwargs: dict | None = None,
 ) -> float:
-    """χ² SNe + BAO con cosmología compartida.
+    """SNe + BAO chi2 with a shared cosmology (Flat w0waCDM).
 
-    rd = None usa el rd Planck fiducial dentro de chi2_bao.
-    sne_kwargs permite pasar M explícita o α/β si se desea.
+    ``rd=None`` uses the Planck fiducial inside ``chi2_bao``.
+    ``sne_kwargs`` lets the caller pass explicit M or alpha/beta to ``chi2_sne``.
     """
     sne_kwargs = sne_kwargs or {}
     chi2_s = chi2_sne(sne_data, model="Flatw0waCDM",
-                     Om=Om, H0=H0, w0=w0, wa=wa, **sne_kwargs)
+                      Om=Om, H0=H0, w0=w0, wa=wa, **sne_kwargs)
     bao_kwargs = dict(Om=Om, w0=w0, wa=wa, H0=H0)
     if rd is not None:
         bao_kwargs["rd"] = rd

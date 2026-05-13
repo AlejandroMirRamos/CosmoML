@@ -1,8 +1,8 @@
-"""χ² para BAO DESI DR2 (Gaussian likelihood).
+"""BAO chi2 (DESI DR2, Gaussian likelihood).
 
-Función teórica común a todos los escenarios BAO:
-  - DM/rs, DH/rs y DV/rs en parametrización CPL (w₀, wₐ).
-  - H₀ y rd tratados como parámetros (puedes fijarlos al fiducial Planck o dejarlos libres).
+Theoretical predictions in flat w0waCDM:
+  - DM/rs, DH/rs and DV/rs as a function of (Om, w0, wa).
+  - H0 and rd can be fixed at Planck or treated as free parameters.
 """
 from __future__ import annotations
 import numpy as np
@@ -16,14 +16,14 @@ _CHI2_BAD = 99999.0
 
 
 def E_w0wa(z: np.ndarray | float, Om: float, w0: float = -1.0, wa: float = 0.0):
-    """E(z) = H(z)/H0 para CPL w(z)=w0 + wa·z/(1+z)."""
+    """E(z) = H(z)/H0 for the CPL parametrization w(z) = w0 + wa*z/(1+z)."""
     f_de = (1 + z) ** (3 * (1 + w0 + wa)) * np.exp(-3 * wa * z / (1 + z))
     return np.sqrt(Om * (1 + z) ** 3 + (1 - Om) * f_de)
 
 
 def DM_w0wa(z: float, Om: float, w0: float = -1.0, wa: float = 0.0,
             H0: float = PLANCK_H0) -> float:
-    """Distancia comóvil transversal D_M(z) = (c/H₀) ∫₀ᶻ dz'/E(z')."""
+    """Transverse comoving distance D_M(z) = (c/H0) * integral_0^z dz'/E(z')."""
     if z == 0:
         return 0.0
     integral, _ = integrate.quad(lambda zp: 1.0 / E_w0wa(zp, Om, w0, wa), 0, z)
@@ -35,7 +35,7 @@ def bao_theory_vector(
     Om: float, w0: float = -1.0, wa: float = 0.0,
     H0: float = PLANCK_H0, rd: float = PLANCK_RD,
 ) -> np.ndarray:
-    """Vector teórico ordenado igual que data.val (mezcla DM/rs, DH/rs, DV/rs)."""
+    """Theory vector ordered like ``data.val`` (mixed DM/rs, DH/rs, DV/rs)."""
     dm_map = {z: DM_w0wa(z, Om, w0, wa, H0=H0) for z in data.unique_z}
     out = np.empty(len(data))
     for i in range(len(data)):
@@ -60,7 +60,7 @@ def chi2_bao(
     Om: float, w0: float = -1.0, wa: float = 0.0,
     H0: float = PLANCK_H0, rd: float = PLANCK_RD,
 ) -> float:
-    """χ² BAO DESI."""
+    """DESI BAO chi2."""
     if not (0 < Om < 1) or H0 <= 0 or rd <= 0:
         return _CHI2_BAD
     try:

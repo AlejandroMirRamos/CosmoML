@@ -1,9 +1,12 @@
-"""Resúmenes y dependencias SHAP para modelos XGBoost ya entrenados.
+"""SHAP analysis for trained XGBoost chi2 models.
 
-Implementa el panel completo que usamos en los notebooks:
-- summary beeswarm + bar (vista global)
-- waterfall en 1 muestra (descomposición local)
-- scatter/dependence por feature (cómo afecta cada parámetro al χ²)
+Provides the full panel used across the notebooks:
+  - summary (beeswarm + bar): global feature importance.
+  - waterfall: per-sample additive decomposition.
+  - scatter/dependence: per-feature effect coloured by SHAP interactions.
+
+Note: when the model is a ``LogChi2Model`` (shifted-log10 target), the SHAP
+values describe contributions to log10(chi2 - chi2_min + 1), NOT to linear chi2.
 """
 from __future__ import annotations
 from pathlib import Path
@@ -12,11 +15,10 @@ import shap
 
 
 def explain(model, X, n_sample: int = 1000, seed: int = 42):
-    """Crea TreeExplainer y devuelve (shap_values, X_sampled).
+    """Build a TreeExplainer and return (shap_values, X_sampled).
 
-    Si el modelo es un LogChi2Model (entrenado en log10(χ²)), opera sobre el
-    XGBRegressor subyacente — los valores SHAP describen contribuciones a
-    log10(χ²), no a χ² lineal. Una contribución de 0.5 ≈ factor 3× en χ².
+    Uses ``check_additivity=False`` because ``LogChi2Model.predict`` applies an
+    inverse-log transform that SHAP cannot trace.
     """
     inner = getattr(model, "raw_model", model)
     explainer = shap.TreeExplainer(inner)
@@ -32,7 +34,7 @@ def shap_summary(
     title: str = "",
     show: bool = False,
 ):
-    """Beeswarm + bar plot. Devuelve (shap_values, X_sampled) para reutilizar."""
+    """Beeswarm + bar plot. Returns ``(shap_values, X_sampled)`` for reuse."""
     save_dir = Path(save_dir); save_dir.mkdir(parents=True, exist_ok=True)
     shap_v, X_s = explain(model, X, n_sample=n_sample)
 
@@ -42,7 +44,7 @@ def shap_summary(
     shap.plots.beeswarm(shap_v, show=False)
     plt.tight_layout()
     out_bs = save_dir / f"{prefix}_shap_beeswarm.png"
-    plt.savefig(out_bs, dpi=300, bbox_inches="tight"); print(f"  guardado: {out_bs}")
+    plt.savefig(out_bs, dpi=300, bbox_inches="tight"); print(f"  saved: {out_bs}")
     plt.show() if show else plt.close()
 
     plt.figure()
@@ -51,7 +53,7 @@ def shap_summary(
     shap.plots.bar(shap_v, show=False)
     plt.tight_layout()
     out_bar = save_dir / f"{prefix}_shap_bar.png"
-    plt.savefig(out_bar, dpi=300, bbox_inches="tight"); print(f"  guardado: {out_bar}")
+    plt.savefig(out_bar, dpi=300, bbox_inches="tight"); print(f"  saved: {out_bar}")
     plt.show() if show else plt.close()
 
     return shap_v, X_s
@@ -64,7 +66,7 @@ def shap_waterfall(
     title: str = "",
     show: bool = False,
 ):
-    """Waterfall plot para una muestra (descomposición local del χ² predicho)."""
+    """Waterfall plot for one sample (per-feature additive decomposition)."""
     plt.figure()
     if title:
         plt.title(title)
@@ -73,7 +75,7 @@ def shap_waterfall(
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    print(f"  guardado: {save_path}")
+    print(f"  saved: {save_path}")
     plt.show() if show else plt.close()
 
 
@@ -83,11 +85,7 @@ def shap_dependence_all(
     prefix: str,
     show: bool = False,
 ):
-    """Un scatter/dependence por feature, coloreado por todas las SHAP (interacciones).
-
-    Guarda como `{prefix}_{col}.png` (sin "shap_dep_" intermedio para mantener
-    nombres cortos compatibles con la convención de figuras del notebook 03).
-    """
+    """One scatter/dependence plot per feature, coloured by all SHAP interactions."""
     save_dir = Path(save_dir); save_dir.mkdir(parents=True, exist_ok=True)
     out_paths = []
     for col in X.columns:
@@ -96,23 +94,23 @@ def shap_dependence_all(
         plt.tight_layout()
         out = save_dir / f"{prefix}_shap_{col}.png"
         plt.savefig(out, dpi=300, bbox_inches="tight")
-        print(f"  guardado: {out}")
+        print(f"  saved: {out}")
         plt.show() if show else plt.close()
         out_paths.append(out)
     return out_paths
 
 
-# Alias retro-compatible: quien usaba shap_dependence(feature, ...) sigue funcionando
 def shap_dependence(
     shap_values, X, feature: str, *,
     save_path: str | Path,
     show: bool = False,
 ):
+    """Single dependence plot for a named feature."""
     plt.figure()
     shap.plots.scatter(shap_values[:, feature], color=shap_values, show=False)
     plt.tight_layout()
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    print(f"  guardado: {save_path}")
+    print(f"  saved: {save_path}")
     plt.show() if show else plt.close()

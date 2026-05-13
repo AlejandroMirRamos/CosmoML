@@ -1,4 +1,4 @@
-"""Entrenamiento, contornos, curva de aprendizaje y análisis SHAP."""
+"""XGBoost training, contours, learning curve and SHAP analysis."""
 import matplotlib.pyplot as plt
 
 from .train import train_xgb, LogChi2Model
@@ -10,7 +10,7 @@ from .shap_utils import (
 
 
 def use_paper_style() -> None:
-    """Estilo común a todos los plots (serif, sin TeX)."""
+    """Apply a shared matplotlib style (serif font, no TeX) to all plots."""
     plt.rcParams["text.usetex"] = False
     plt.rcParams["font.family"] = "serif"
 

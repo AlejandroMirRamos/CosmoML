@@ -49,6 +49,12 @@ from cosmoml.ml import (
 )
 from cosmoml.ml.marginal import _parallel_mcmc, _render_getdist
 
+try:
+    from cosmoml.theory.jax_theory import make_chi2_gpu_fn as _make_chi2_gpu_fn
+    _JAX_THEORY_OK = True
+except ImportError:
+    _JAX_THEORY_OK = False
+
 use_paper_style()
 
 # ── GPU predict wrapper (bypasa la copia CPU que usa plot_corner_marginal) ─────
@@ -355,6 +361,56 @@ def run_theory_mcmc(chi2_fn, features, ranges, ref, section,
     return samples, meta
 
 
+def run_theory_mcmc_gpu(gpu_predict_fn, features, ranges, ref, section,
+                        labels, markers=None, title=""):
+    """MCMC teórico GPU via JAX — paralelo a run_theory_mcmc (CPU).
+
+    Usa el mismo _parallel_mcmc con 1024 cadenas pero el predict_fn
+    es el surrogate JAX/GPU (chi2 teórico exacto vectorizado en GPU).
+    Retorna (flat_samples, meta_dict).
+    """
+    chain_path  = CHAINS_DIR  / f"{section}_samples_theory_gpu.npy"
+    figure_path = FIGURES_DIR / f"{section}_getdist_theory_gpu.png"
+
+    lows   = np.array([ranges[f][0] for f in features])
+    highs  = np.array([ranges[f][1] for f in features])
+    center = np.array([ref[f] for f in features]) if ref else (lows + highs) / 2.0
+
+    if chain_path.exists() and not FORCE_RETRAIN:
+        print(f"  [TH-GPU]  Cache: {chain_path}")
+        samples = np.load(chain_path)
+        meta = {"cached": True, "wall_s": None, "n_steps_actual": None,
+                "ess_final": None, "tau_max": None, "n_samples": len(samples)}
+    else:
+        print(f"  [TH-GPU]  MCMC teórico JAX/GPU...")
+        t0 = time.perf_counter()
+        samples = _parallel_mcmc(
+            gpu_predict_fn, lows, highs, center, len(features),
+            n_chains=1024, n_steps=10_000, burn_in=500, seed=42, ess_target=10_000,
+        )
+        wall = time.perf_counter() - t0
+        np.save(chain_path, samples)
+        print(f"  [TH-GPU]  Chain guardado: {chain_path}  ({wall:.1f}s)")
+
+        from cosmoml.ml.marginal import _sokal_tau
+        tau = _sokal_tau(samples.reshape(len(samples) // 1024, 1024, len(features))
+                         if samples.ndim == 2 else samples)
+        ess = len(samples) / tau
+        meta = {"cached": False, "wall_s": round(wall, 2),
+                "n_steps_actual": None, "ess_final": round(ess, 1),
+                "tau_max": round(tau, 2), "n_samples": len(samples)}
+
+    fig = _render_getdist(
+        samples, features,
+        [labels.get(f, f).replace("$", "") for f in features],
+        markers, title + " [Theory GPU]", smooth_scale=0.5, ranges=ranges,
+    )
+    fig.savefig(figure_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  [TH-GPU]  Guardado: {figure_path}")
+    return samples, meta
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Chi2 functions — deben estar a nivel de módulo (picklables por ProcessPoolExecutor)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -651,23 +707,94 @@ def main():
     else:
         print("  [!] Chains theory incompletos — 3-way theory omitido.")
 
+    # ── Section 3: Theory MCMC GPU benchmark (JAX) ────────────────────────────
+    th_gpu_meta_bao = th_gpu_meta_pb = th_gpu_meta_pbc = None
+    if _JAX_THEORY_OK:
+        print(f"\n{'='*60}\n=== Section 3: Theory MCMC JAX/GPU benchmark ===")
+
+        print("\n  Compilando funciones JAX (warm-up)...")
+        gpu_fn_bao = _make_chi2_gpu_fn(panth=None,  bao=bao)
+        gpu_fn_pb  = _make_chi2_gpu_fn(panth=panth, bao=bao)
+        gpu_fn_pbc = _make_chi2_gpu_fn(panth=panth, bao=bao, planck_prior=True)
+        print("  JAX JIT listo.")
+
+        print("\n  --- BAO-only (theory GPU)")
+        _, th_gpu_meta_bao = run_theory_mcmc_gpu(
+            gpu_fn_bao, FEATURES_4, RANGES_4, REF_3_bao, SECTION_3_BAO,
+            labels=LABELS, markers=MARKERS_DE, title=TITLE_3_BAO,
+        )
+
+        print("\n  --- Pantheon+ + BAO (theory GPU)")
+        _, th_gpu_meta_pb = run_theory_mcmc_gpu(
+            gpu_fn_pb, FEATURES_4, RANGES_4, REF_2_1a, SECTION_2_1A,
+            labels=LABELS, markers=MARKERS_DE, title=TITLE_2_1A,
+        )
+
+        print("\n  --- Pantheon+ + BAO + CMB (theory GPU)")
+        _, th_gpu_meta_pbc = run_theory_mcmc_gpu(
+            gpu_fn_pbc, FEATURES_4, RANGES_4, REF_2_1b, SECTION_2_1B,
+            labels=LABELS, markers=MARKERS_DE, title=TITLE_2_1B,
+        )
+
+        # 3-way comparison theory GPU
+        _chain_tg_bao = CHAINS_DIR / f"{SECTION_3_BAO}_samples_theory_gpu.npy"
+        _chain_tg_pb  = CHAINS_DIR / f"{SECTION_2_1A}_samples_theory_gpu.npy"
+        _chain_tg_pbc = CHAINS_DIR / f"{SECTION_2_1B}_samples_theory_gpu.npy"
+        if all(p.exists() for p in [_chain_tg_bao, _chain_tg_pb, _chain_tg_pbc]):
+            plot_getdist_comparison(
+                [np.load(_chain_tg_bao), np.load(_chain_tg_pb), np.load(_chain_tg_pbc)],
+                ["BAO", "BAO + Pantheon+", "BAO + Pantheon+ + CMB"],
+                FEATURES_4, LABELS,
+                markers=MARKERS_DE,
+                title="w0waCDM — Summary Theory GPU: BAO / BAO+Pantheon+ / BAO+Pantheon++CMB",
+                save_path=FIGURES_DIR / "6_3_summary_getdist_theory_gpu.png",
+                filled=[True, True, True],
+                ranges=RANGES_4,
+            )
+    else:
+        print("\n  [!] JAX no disponible — benchmark GPU-theory omitido.")
+        print("      Instala con: pip install 'jax[cuda]'")
+
     # ── Timings JSON ──────────────────────────────────────────────────────────
     def _speedup(ml_m, th_m):
         w_ml, w_th = ml_m.get("wall_s"), th_m.get("wall_s")
         return round(w_th / w_ml, 2) if (w_ml and w_th) else None
 
+    def _meta_or_skip(m):
+        return m if m is not None else {"wall_s": None, "ess_final": None,
+                                        "n_samples": None, "cached": True}
+
     timings = {
-        "ml_engine":     "RWMH paralelo 1024 chains, GPU booster (LogChi2)",
-        "theory_engine": "RWMH paralelo 1024 chains, CPU ProcessPoolExecutor",
+        "ml_engine":         "RWMH paralelo 1024 chains, GPU booster (LogChi2)",
+        "theory_cpu_engine": "RWMH paralelo 1024 chains, CPU ProcessPoolExecutor",
+        "theory_gpu_engine": "RWMH paralelo 1024 chains, JAX vmap GPU (chi2 exacta)",
         "common": {"n_chains": 1024, "n_steps_cap": 10_000,
                    "burn_in": 500, "seed": 42, "ess_target": 10_000},
         "runs": {
-            "bao_only":    {"ml": ml_meta_bao, "theory": th_meta_bao,
-                            "speedup": _speedup(ml_meta_bao,  th_meta_bao)},
-            "panth_bao":   {"ml": ml_meta_pb,  "theory": th_meta_pb,
-                            "speedup": _speedup(ml_meta_pb,   th_meta_pb)},
-            "panth_bao_cmb": {"ml": ml_meta_pbc, "theory": th_meta_pbc,
-                              "speedup": _speedup(ml_meta_pbc, th_meta_pbc)},
+            "bao_only": {
+                "ml":         ml_meta_bao,
+                "theory_cpu": th_meta_bao,
+                "theory_gpu": _meta_or_skip(th_gpu_meta_bao),
+                "speedup_cpu_vs_ml":  _speedup(ml_meta_bao, th_meta_bao),
+                "speedup_gpu_vs_ml":  _speedup(ml_meta_bao, _meta_or_skip(th_gpu_meta_bao)),
+                "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_bao), th_meta_bao),
+            },
+            "panth_bao": {
+                "ml":         ml_meta_pb,
+                "theory_cpu": th_meta_pb,
+                "theory_gpu": _meta_or_skip(th_gpu_meta_pb),
+                "speedup_cpu_vs_ml":  _speedup(ml_meta_pb, th_meta_pb),
+                "speedup_gpu_vs_ml":  _speedup(ml_meta_pb, _meta_or_skip(th_gpu_meta_pb)),
+                "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_pb), th_meta_pb),
+            },
+            "panth_bao_cmb": {
+                "ml":         ml_meta_pbc,
+                "theory_cpu": th_meta_pbc,
+                "theory_gpu": _meta_or_skip(th_gpu_meta_pbc),
+                "speedup_cpu_vs_ml":  _speedup(ml_meta_pbc, th_meta_pbc),
+                "speedup_gpu_vs_ml":  _speedup(ml_meta_pbc, _meta_or_skip(th_gpu_meta_pbc)),
+                "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_pbc), th_meta_pbc),
+            },
         },
     }
     timings_path = PAPER_DIR / "timings.json"
@@ -681,20 +808,26 @@ def main():
     def _fsp(v):
         return f"{v:.1f}×" if v is not None else "–"
     rows = [
-        ("bao_only",      ml_meta_bao, th_meta_bao),
-        ("panth_bao",     ml_meta_pb,  th_meta_pb),
-        ("panth_bao_cmb", ml_meta_pbc, th_meta_pbc),
+        ("bao_only",      ml_meta_bao, th_meta_bao, th_gpu_meta_bao),
+        ("panth_bao",     ml_meta_pb,  th_meta_pb,  th_gpu_meta_pb),
+        ("panth_bao_cmb", ml_meta_pbc, th_meta_pbc, th_gpu_meta_pbc),
     ]
-    print("\n" + "─" * 72)
-    print(f"{'section':<18}{'ml [s]':>10}{'theory [s]':>12}{'speedup':>10}  ess(ml/th)")
-    print("─" * 72)
-    for name, ml_m, th_m in rows:
-        sp = _speedup(ml_m, th_m)
-        e_ml = f"{int(ml_m['ess_final'])}" if ml_m.get("ess_final") else "–"
-        e_th = f"{int(th_m['ess_final'])}" if th_m.get("ess_final") else "–"
-        print(f"{name:<18}{_fs(ml_m['wall_s']):>10}{_fs(th_m['wall_s']):>12}"
-              f"{_fsp(sp):>10}  {e_ml}/{e_th}")
-    print("─" * 72)
+    print("\n" + "─" * 90)
+    print(f"{'section':<18}{'ml [s]':>10}{'th-cpu [s]':>12}{'th-gpu [s]':>12}"
+          f"{'×cpu/ml':>9}{'×gpu/ml':>9}{'×gpu/cpu':>10}")
+    print("─" * 90)
+    for name, ml_m, th_m, tg_m in rows:
+        tg = _meta_or_skip(tg_m)
+        print(
+            f"{name:<18}"
+            f"{_fs(ml_m['wall_s']):>10}"
+            f"{_fs(th_m['wall_s']):>12}"
+            f"{_fs(tg['wall_s']):>12}"
+            f"{_fsp(_speedup(ml_m, th_m)):>9}"
+            f"{_fsp(_speedup(ml_m, tg)):>9}"
+            f"{_fsp(_speedup(tg, th_m)):>10}"
+        )
+    print("─" * 90)
 
     print("\n=== DONE ===")
     print(f"  Figuras  : {FIGURES_DIR}/")

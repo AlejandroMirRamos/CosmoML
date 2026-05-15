@@ -10,3 +10,4 @@ jupyter>=1.0
 emcee>=3.1
 corner>=2.2
 getdist>=1.4
+iminuit>=2.0

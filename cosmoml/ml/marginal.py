@@ -212,6 +212,7 @@ def _render_getdist(
     markers: dict[str, float] | None,
     title: str,
     smooth_scale: float,
+    ranges: dict[str, tuple[float, float]] | None = None,
 ) -> matplotlib.figure.Figure:
     try:
         import getdist
@@ -219,10 +220,12 @@ def _render_getdist(
     except ImportError as e:
         raise ImportError("getdist required: pip install getdist") from e
 
+    mc_ranges = {f: list(r) for f, r in ranges.items()} if ranges else None
     mc = getdist.MCSamples(
         samples=samples,
         names=features,
         labels=str_labels,
+        ranges=mc_ranges,
         settings={"smooth_scale_2D": smooth_scale, "smooth_scale_1D": smooth_scale},
     )
     g = getdist.plots.get_subplot_plotter()
@@ -234,6 +237,16 @@ def _render_getdist(
         marker_args={"ls": "--", "color": "gray", "lw": 1.5, "alpha": 0.8}
         if markers else None,
     )
+    if ranges:
+        ndim = len(features)
+        for i in range(ndim):
+            for j in range(i + 1):
+                ax = g.subplots[i][j]
+                if ax is None:
+                    continue
+                ax.set_xlim(*ranges[features[j]])
+                if i != j:
+                    ax.set_ylim(*ranges[features[i]])
     if title:
         g.fig.suptitle(title, fontsize=12, y=1.01)
     return g.fig
@@ -327,7 +340,8 @@ def plot_corner_marginal(
         ess_target=ess_target,
     )
 
-    fig = _render_getdist(samples, features, str_labels, markers, title, smooth_scale)
+    fig = _render_getdist(samples, features, str_labels, markers, title, smooth_scale,
+                          ranges=ranges)
 
     if save_path:
         save_path = Path(save_path)

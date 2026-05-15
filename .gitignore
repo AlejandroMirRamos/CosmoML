@@ -1,8 +1,10 @@
 # ── Figuras (regenerables) ────────────────────────────────────────────────
 outputs/figures/**/*.png
 
-# ── Archivos que exceden el límite de 100 MB de GitHub ───────────────────
-outputs/models/4_1_model.ubj
+# ── Outputs binarios grandes (modelos y chains, regenerables) ────────────
+outputs/models/
+outputs/chains/
+outputs/datasets/
 data/des/DES-SN5YR-1.2.zip
 
 # ── Python ────────────────────────────────────────────────────────────────

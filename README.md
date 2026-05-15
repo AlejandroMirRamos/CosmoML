@@ -53,9 +53,23 @@ CosmoML/
 ## Setup
 
 ```bash
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate        # Linux / macOS
+# .venv\Scripts\activate         # Windows
+
+# Install dependencies
 pip install -r requirements.txt
-# or, to install the library in editable mode:
+
+# Or install the library in editable mode (includes all dependencies)
 pip install -e .
+```
+
+For GPU support (JAX — optional, needed for `run_cosmo.py` GPU benchmarks):
+
+```bash
+pip install "jax[cuda]"          # NVIDIA GPU (CUDA)
+# pip install "jax[cpu]"         # CPU-only fallback
 ```
 
 ## Usage pattern (notebook)

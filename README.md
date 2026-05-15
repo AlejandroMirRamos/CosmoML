@@ -1,63 +1,64 @@
 # CosmoML
 
-Análisis ML (XGBoost + SHAP) de likelihoods cosmológicos: supernovas Ia
-(Pantheon+SH0ES, DES-SN5YR 2024/2025) y BAO (DESI DR2), en distintos modelos
-(ΛCDM, wCDM, w₀wₐCDM) y combinaciones (SNe + BAO).
+ML analysis (XGBoost + SHAP) of cosmological likelihoods: Type Ia supernovae
+(Pantheon+SH0ES, DES-SN5YR 2024/2025) and BAO (DESI DR2), across multiple models
+(ΛCDM, wCDM, w₀wₐCDM) and dataset combinations (SNe + BAO).
 
 ## Notebooks
 
-| # | Notebook | Escenarios |
+| # | Notebook | Scenarios |
 |---|---|---|
-| 01 | [SNe Pantheon+SH0ES](notebooks/01_SN_Panth+.ipynb) | [1.1 FlatLCDM 2D](notebooks/01_SN_Panth+.ipynb#1-1) · [1.2 Non-flat ΛCDM 3D](notebooks/01_SN_Panth+.ipynb#1-2) · [1.3 FlatLCDM+M 3D](notebooks/01_SN_Panth+.ipynb#1-3) · [1.4 SALT2 α/β 4D](notebooks/01_SN_Panth+.ipynb#1-4) · [1.5 wCDM 3D](notebooks/01_SN_Panth+.ipynb#1-5) · [1.6 w₀wₐCDM+SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-6) · [1.7 w₀wₐCDM sin SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-7) · [1.8 w₀wₐCDM z>0.25 4D](notebooks/01_SN_Panth+.ipynb#1-8) |
+| 01 | [SNe Pantheon+SH0ES](notebooks/01_SN_Panth+.ipynb) | [1.1 FlatLCDM 2D](notebooks/01_SN_Panth+.ipynb#1-1) · [1.2 Non-flat ΛCDM 3D](notebooks/01_SN_Panth+.ipynb#1-2) · [1.3 FlatLCDM+M 3D](notebooks/01_SN_Panth+.ipynb#1-3) · [1.4 SALT2 α/β 4D](notebooks/01_SN_Panth+.ipynb#1-4) · [1.5 wCDM 3D](notebooks/01_SN_Panth+.ipynb#1-5) · [1.6 w₀wₐCDM+SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-6) · [1.7 w₀wₐCDM no SH0ES 4D](notebooks/01_SN_Panth+.ipynb#1-7) · [1.8 w₀wₐCDM z>0.25 4D](notebooks/01_SN_Panth+.ipynb#1-8) |
 | 02 | [SNe DES SN5YR](notebooks/02_SN_DES.ipynb) | [2.1 wCDM DES2024 2D](notebooks/02_SN_DES.ipynb#2-1) · [2.2 wCDM DES2025 2D](notebooks/02_SN_DES.ipynb#2-2) · [2.3 w₀wₐCDM DES2024 3D](notebooks/02_SN_DES.ipynb#2-3) · [2.4 w₀wₐCDM DES2025 3D](notebooks/02_SN_DES.ipynb#2-4) |
 | 03 | [BAO DESI DR2](notebooks/03_BAO.ipynb) | [3.1 wCDM 2D](notebooks/03_BAO.ipynb#3-1) · [3.2 wCDM+H0 3D](notebooks/03_BAO.ipynb#3-2) · [3.3 w₀wₐCDM full 3D](notebooks/03_BAO.ipynb#3-3) · [3.4 w₀wₐCDM z<2 3D](notebooks/03_BAO.ipynb#3-4) · [3.5 w₀wₐCDM+rd Planck 4D](notebooks/03_BAO.ipynb#3-5) · [3.6 H0·rd 4D](notebooks/03_BAO.ipynb#3-6) · [3.7 H0–rd degeneracy 5D](notebooks/03_BAO.ipynb#3-7) · [3.8 +priors Om/H0/rd 5D](notebooks/03_BAO.ipynb#3-8) · [3.9 +5 Planck priors 5D](notebooks/03_BAO.ipynb#3-9) |
 | 04 | [Joint SNe + BAO](notebooks/04_SN+BAO.ipynb) | [4.1 Joint w₀wₐCDM 4D](notebooks/04_SN+BAO.ipynb#4-1) · [4.2 SNe vs BAO Ωm=0.40 prior](notebooks/04_SN+BAO.ipynb#4-2) · [4.3 w₀–wₐ overlay ellipses](notebooks/04_SN+BAO.ipynb#4-3) · [4.4 1D constraint wₐ](notebooks/04_SN+BAO.ipynb#4-4) |
-| 05 | [Figuras para el paper](notebooks/05_Figures.ipynb) | [5.1 Fig 8 — ΛCDM BAO (Ωm, H0·rd)](notebooks/05_Figures.ipynb#5-1) · [5.2 Fig 12 — wCDM overlay 3 datasets](notebooks/05_Figures.ipynb#5-2) · [5.3 Fig 13 — μ(z) residuals](notebooks/05_Figures.ipynb#5-3) |
+| 05 | [Special paper figures](notebooks/05_Figures.ipynb) | [5.1 Fig 8 — ΛCDM BAO (Ωm, H0·rd)](notebooks/05_Figures.ipynb#5-1) · [5.2 Fig 12 — wCDM overlay 3 datasets](notebooks/05_Figures.ipynb#5-2) · [5.3 Fig 13 — μ(z) residuals](notebooks/05_Figures.ipynb#5-3) · [5.4 ML test: CPL vs Taylor 4th order](notebooks/05_Figures.ipynb#5-4) |
+| 06 | [Paper: full pipeline](notebooks/06_Paper.ipynb) | [6.1 ΛCDM · Pantheon+ + BAO](notebooks/06_Paper.ipynb#section-1) · [6.2.1a w₀wₐCDM · Pantheon+ + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.1b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.2.2a DES-2024 + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.2b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.2.3a DES-2025 + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.3b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.3 Final summary: BAO / BAO+Pantheon+ / BAO+Pantheon++CMB](notebooks/06_Paper.ipynb#section-3) |
 
-## Estructura
+## Structure
 
 ```
 CosmoML/
-├── cosmoml/            # librería importable (lo que antes se duplicaba en cada script)
+├── cosmoml/            # importable library (shared across all notebooks)
 │   ├── data/          # loaders: pantheon.py, des.py, desi_bao.py
 │   ├── theory/        # χ²: sne.py, bao.py, joint.py
 │   ├── ml/            # train.py, contour.py, shap_utils.py
-│   ├── sampling.py    # generador de datasets χ² (rodajas + nube + ancla)
-│   ├── priors.py      # priors gaussianos Planck
-│   └── config.py      # rutas, constantes, fiduciales
-├── data/              # datos observacionales (input — no se modifican)
+│   ├── sampling.py    # χ² dataset generator (slices + cloud + anchor)
+│   ├── priors.py      # Planck Gaussian priors
+│   └── config.py      # paths, constants, fiducials
+├── data/              # observational data (input — read-only)
 │   ├── pantheon/      # Pantheon+SH0ES.dat / .cov
-│   ├── des/           # DES-SN5YR 2024 y 2025
+│   ├── des/           # DES-SN5YR 2024 and 2025
 │   └── desi_bao/      # DESI DR2 mean + cov
-├── outputs/           # generado (gitignored)
-│   ├── datasets/      # CSVs χ² para entrenar XGBoost
-│   ├── figures/       # PNGs por escenario
-│   └── models/        # (opcional) modelos XGBoost cacheados
-├── notebooks/         # un notebook por escenario (a generar en Fase 2)
-│   └── figures/       # notebooks de figuras finales (Fig8, Fig12, Fig13)
-├── scripts/           # generadores headless (CLI), opcionales
-└── legacy/            # scripts originales archivados (a borrar tras validar)
+├── outputs/           # generated (gitignored)
+│   ├── datasets/      # χ² CSVs for XGBoost training
+│   ├── figures/       # PNGs per scenario
+│   └── models/        # (optional) cached XGBoost models
+├── notebooks/         # one notebook per scenario
+│   └── figures/       # final paper figures (Fig8, Fig12, Fig13)
+├── scripts/           # headless generators (CLI), optional
+└── legacy/            # archived original scripts (to be deleted after validation)
 ```
 
-## Filosofía
+## Design principles
 
-- **`cosmoml/`**: todo lo común (carga de datos, χ² del modelo, sampling, training,
-  contornos, SHAP). Importable desde cualquier notebook.
-- **`notebooks/<escenario>.ipynb`**: configuración específica de cada escenario
-  (modelo, dataset, rangos de parámetros, priors). Carga el CSV cacheado si
-  existe, si no lo regenera.
-- **`outputs/`**: todo lo que se puede regenerar. Se ignora en git.
+- **`cosmoml/`**: all shared logic (data loading, model χ², sampling, training,
+  contours, SHAP). Importable from any notebook.
+- **`notebooks/<scenario>.ipynb`**: scenario-specific configuration
+  (model, dataset, parameter ranges, priors). Loads the cached CSV if it
+  exists, otherwise regenerates it.
+- **`outputs/`**: everything that can be regenerated. Git-ignored.
 - **`data/`**: read-only.
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
-# o, si quieres instalar la librería editable:
+# or, to install the library in editable mode:
 pip install -e .
 ```
 
-## Patrón de uso (notebook)
+## Usage pattern (notebook)
 
 ```python
 from cosmoml.data import load_pantheon_plus
@@ -68,7 +69,7 @@ from cosmoml.ml import train_xgb, plot_contour_2d, shap_summary, use_paper_style
 use_paper_style()
 sne = load_pantheon_plus()
 
-# Genera o carga el CSV cacheado
+# Generate or load the cached CSV
 df = load_or_build(
     "outputs/datasets/wCDM_Pantheon.csv",
     builder=lambda: build_chi2_dataset(
@@ -100,9 +101,9 @@ plot_contour_2d(
 )
 ```
 
-## Estado de la migración
+## Migration status
 
-- ✅ **Fase 1**: librería + reorganización de carpetas (este commit).
-- 🚧 **Fase 2**: 1-2 notebooks piloto (próximo paso).
-- ⏳ **Fase 3**: el resto de los ~14 escenarios.
-- ⏳ **Fase 4**: borrar `legacy/` cuando todos los escenarios estén validados.
+- ✅ **Phase 1**: library + folder reorganisation (this commit).
+- ✅ **Phase 2**: pilot notebooks 01–04.
+- ✅ **Phase 3**: special figures notebook (05) + full paper pipeline (06).
+- ⏳ **Phase 4**: delete `legacy/` once all scenarios are validated.

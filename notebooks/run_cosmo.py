@@ -162,6 +162,142 @@ def build_dataset(chi2_fn, section, features, ranges):
     return df, REF
 
 
+def _generate_param_array(features, ranges, ref, ndim):
+    """Replicate build_chi2_dataset's sampling exactly (seed=42).
+
+    Matches _sample_uniform call order: for each slice, rng is called for the
+    two range-valued keys (fi then fj) in insertion order; fixed keys don't
+    consume RNG. Random box calls rng once per feature in features order.
+    Returns (arr [N, ndim], params dict).
+    """
+    rng = np.random.default_rng(42)
+
+    if ndim == 2:
+        # build_dataset 2D: two slices of 15k + random 50k
+        slices_spec = [
+            {features[0]: ranges[features[0]], features[1]: ref[features[1]]},
+            {features[1]: ranges[features[1]], features[0]: ref[features[0]]},
+        ]
+        n_slice, n_random = 15_000, 50_000
+    else:
+        # build_dataset nD: C(ndim,2) slices of 20k + random 80k
+        slices_spec = []
+        for _i in range(ndim):
+            for _j in range(_i + 1, ndim):
+                fi, fj = features[_i], features[_j]
+                fixed = {f: ref[f] for f in features if f not in (fi, fj)}
+                slices_spec.append({fi: ranges[fi], fj: ranges[fj], **fixed})
+        n_slice, n_random = 20_000, 80_000
+
+    blocks = []
+    for spec in slices_spec:
+        block = {}
+        for k, v in spec.items():
+            block[k] = (rng.uniform(v[0], v[1], n_slice)
+                        if isinstance(v, tuple) else np.full(n_slice, float(v)))
+        blocks.append(block)
+
+    # Random box: features in list order (matches {f: ranges[f] for f in features})
+    random_block = {f: rng.uniform(ranges[f][0], ranges[f][1], n_random)
+                    for f in features}
+    blocks.append(random_block)
+
+    params = {f: np.concatenate([b[f] for b in blocks]) for f in features}
+    arr = np.column_stack([params[f] for f in features]).astype(np.float32)
+    return arr, params
+
+
+def build_dataset_gpu(gpu_predict_fn, chi2_fn_cpu, section, features, ranges, ref):
+    """GPU counterpart of build_dataset: same sampling (seed=42), chi2 via JAX vmap.
+
+    Compares chi2 values against the existing CPU dataset (must already exist)
+    and runs a timed CPU sample evaluation so wall times can be compared in the
+    same script run.
+
+    Returns (df_gpu, meta) where meta contains:
+        gpu_wall_s     — GPU evaluation wall time
+        cpu_sample_s   — CPU wall time for N_CPU_SAMPLE points
+        cpu_extrap_s   — extrapolated CPU time for the full dataset
+        speedup        — cpu_extrap_s / gpu_wall_s
+        max_abs_diff   — max|chi2_cpu - chi2_gpu| over all matched rows
+        mean_abs_diff  — mean|chi2_cpu - chi2_gpu|
+        max_rel_diff   — max relative difference
+    """
+    csv_gpu  = DATASETS_DIR / f"{section}_dataset_gpu.csv"
+    csv_cpu  = DATASETS_DIR / f"{section}_dataset.csv"
+    ndim     = len(features)
+    n_cores  = max(1, multiprocessing.cpu_count() - 1)
+
+    arr, params = _generate_param_array(features, ranges, ref, ndim)
+    total = len(arr)
+
+    # ── GPU generation ─────────────────────────────────────────────────────────
+    if csv_gpu.exists() and not FORCE_RETRAIN:
+        print(f"  [DS-GPU]  Cache: {csv_gpu} ({total:,} pts)")
+        df_gpu = pd.read_csv(csv_gpu)
+        gpu_wall = None
+    else:
+        print(f"  [DS-GPU]  Evaluando {total:,} puntos (JAX GPU batch)...")
+        t0 = time.perf_counter()
+        chi2_gpu = gpu_predict_fn(arr)
+        gpu_wall = time.perf_counter() - t0
+        print(f"  [DS-GPU]  {gpu_wall:.2f}s  ({total / gpu_wall:,.0f} pts/s)")
+        df_gpu = pd.DataFrame({**params, "chi2": chi2_gpu})[features + ["chi2"]]
+        df_gpu.to_csv(csv_gpu, index=False)
+        print(f"  [DS-GPU]  Guardado: {csv_gpu}")
+
+    # ── CPU sample for timing comparison ───────────────────────────────────────
+    N_CPU_SAMPLE = 5_000
+    sample_arr = arr[:N_CPU_SAMPLE]
+    tasks = [
+        (chi2_fn_cpu, {f: float(sample_arr[i, j]) for j, f in enumerate(features)})
+        for i in range(N_CPU_SAMPLE)
+    ]
+    print(f"  [DS-CPU]  Timing sample {N_CPU_SAMPLE:,} pts ({n_cores} cores)...")
+    t0 = time.perf_counter()
+    with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as ex:
+        chi2_cpu_sample = np.array(list(ex.map(_chi2_worker, tasks, chunksize=100)),
+                                   dtype=float)
+    cpu_sample_wall = time.perf_counter() - t0
+    cpu_extrap = cpu_sample_wall / N_CPU_SAMPLE * total
+    print(f"  [DS-CPU]  {cpu_sample_wall:.1f}s para {N_CPU_SAMPLE:,} pts "
+          f"→ extrapolado full: {cpu_extrap:.0f}s")
+
+    speedup = (cpu_extrap / gpu_wall) if (gpu_wall and gpu_wall > 0) else None
+    if speedup:
+        print(f"  [DS-SPD]  Speedup GPU vs CPU (extrapolado): {speedup:.1f}×")
+
+    # ── chi2 comparison vs CPU dataset ─────────────────────────────────────────
+    cmp = {}
+    if csv_cpu.exists():
+        df_cpu = pd.read_csv(csv_cpu)
+        n_cmp = min(len(df_cpu), len(df_gpu))
+        diff = np.abs(df_cpu["chi2"].values[:n_cmp] - df_gpu["chi2"].values[:n_cmp])
+        rel  = diff / np.abs(df_cpu["chi2"].values[:n_cmp]).clip(1e-10)
+        cmp  = {
+            "n":             int(n_cmp),
+            "max_abs_diff":  float(diff.max()),
+            "mean_abs_diff": float(diff.mean()),
+            "max_rel_diff":  float(rel.max()),
+        }
+        print(f"  [DS-CMP]  n={n_cmp:,} | "
+              f"max|Δχ²|={cmp['max_abs_diff']:.4f} | "
+              f"mean|Δχ²|={cmp['mean_abs_diff']:.4f} | "
+              f"max_rel={cmp['max_rel_diff']:.2e}")
+    else:
+        print(f"  [DS-CMP]  CPU dataset not found at {csv_cpu} — skipping comparison.")
+
+    meta = {
+        "gpu_wall_s":    round(gpu_wall, 2) if gpu_wall else None,
+        "cpu_sample_s":  round(cpu_sample_wall, 2),
+        "cpu_extrap_s":  round(cpu_extrap, 1),
+        "speedup":       round(speedup, 1) if speedup else None,
+        "n_pts":         int(total),
+        "comparison":    cmp,
+    }
+    return df_gpu, meta
+
+
 def train_and_shap(df, features, section, title=""):
     model, info = train_xgb(
         df, features=features,
@@ -736,6 +872,49 @@ def main():
             labels=LABELS, markers=MARKERS_DE, title=TITLE_2_1B,
         )
 
+        # ── GPU dataset generation & comparison ───────────────────────────────
+        print(f"\n{'='*60}\n=== Section 3: Dataset generation GPU vs CPU ===")
+        ds_gpu_meta_bao = ds_gpu_meta_pb = ds_gpu_meta_pbc = None
+
+        print("\n  --- BAO-only dataset (GPU)")
+        _, ds_gpu_meta_bao = build_dataset_gpu(
+            gpu_fn_bao, chi2_bao_only,
+            SECTION_3_BAO, FEATURES_4, RANGES_4, REF_3_bao,
+        )
+
+        print("\n  --- Pantheon+ + BAO dataset (GPU)")
+        _, ds_gpu_meta_pb = build_dataset_gpu(
+            gpu_fn_pb, chi2_panth_bao,
+            SECTION_2_1A, FEATURES_4, RANGES_4, REF_2_1a,
+        )
+
+        print("\n  --- Pantheon+ + BAO + CMB dataset (GPU)")
+        _, ds_gpu_meta_pbc = build_dataset_gpu(
+            gpu_fn_pbc, chi2_panth_bao_cmb,
+            SECTION_2_1B, FEATURES_4, RANGES_4, REF_2_1b,
+        )
+
+        # Dataset comparison table (stdout)
+        print("\n" + "─" * 86)
+        print(f"{'scenario':<22}{'gpu [s]':>10}{'cpu×5k→extrap':>16}"
+              f"{'speedup':>10}{'max|Δχ²|':>12}{'mean|Δχ²|':>12}")
+        print("─" * 86)
+        def _dsrow(name, m):
+            if m is None:
+                print(f"  {name}")
+                return
+            cmp = m.get("comparison", {})
+            gpu_s  = f"{m['gpu_wall_s']:.1f}s" if m["gpu_wall_s"] else "cached"
+            cpu_s  = f"{m['cpu_sample_s']:.1f}s→{m['cpu_extrap_s']:.0f}s"
+            spd    = f"{m['speedup']:.1f}×" if m["speedup"] else "–"
+            maxd   = f"{cmp['max_abs_diff']:.4f}" if cmp.get("max_abs_diff") else "–"
+            meand  = f"{cmp['mean_abs_diff']:.4f}" if cmp.get("mean_abs_diff") else "–"
+            print(f"{name:<22}{gpu_s:>10}{cpu_s:>16}{spd:>10}{maxd:>12}{meand:>12}")
+        _dsrow("bao_only",      ds_gpu_meta_bao)
+        _dsrow("panth_bao",     ds_gpu_meta_pb)
+        _dsrow("panth_bao_cmb", ds_gpu_meta_pbc)
+        print("─" * 86)
+
         # 3-way comparison theory GPU
         _chain_tg_bao = CHAINS_DIR / f"{SECTION_3_BAO}_samples_theory_gpu.npy"
         _chain_tg_pb  = CHAINS_DIR / f"{SECTION_2_1A}_samples_theory_gpu.npy"
@@ -752,7 +931,8 @@ def main():
                 ranges=RANGES_4,
             )
     else:
-        print("\n  [!] JAX no disponible — benchmark GPU-theory omitido.")
+        ds_gpu_meta_bao = ds_gpu_meta_pb = ds_gpu_meta_pbc = None
+        print("\n  [!] JAX no disponible — benchmark GPU-theory y GPU-dataset omitidos.")
         print("      Instala con: pip install 'jax[cuda]'")
 
     # ── Timings JSON ──────────────────────────────────────────────────────────
@@ -768,6 +948,7 @@ def main():
         "ml_engine":         "RWMH paralelo 1024 chains, GPU booster (LogChi2)",
         "theory_cpu_engine": "RWMH paralelo 1024 chains, CPU ProcessPoolExecutor",
         "theory_gpu_engine": "RWMH paralelo 1024 chains, JAX vmap GPU (chi2 exacta)",
+        "dataset_gpu_engine": "JAX vmap GPU batch, mismo sampling que CPU (seed=42)",
         "common": {"n_chains": 1024, "n_steps_cap": 10_000,
                    "burn_in": 500, "seed": 42, "ess_target": 10_000},
         "runs": {
@@ -775,6 +956,7 @@ def main():
                 "ml":         ml_meta_bao,
                 "theory_cpu": th_meta_bao,
                 "theory_gpu": _meta_or_skip(th_gpu_meta_bao),
+                "dataset_gpu": ds_gpu_meta_bao,
                 "speedup_cpu_vs_ml":  _speedup(ml_meta_bao, th_meta_bao),
                 "speedup_gpu_vs_ml":  _speedup(ml_meta_bao, _meta_or_skip(th_gpu_meta_bao)),
                 "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_bao), th_meta_bao),
@@ -783,6 +965,7 @@ def main():
                 "ml":         ml_meta_pb,
                 "theory_cpu": th_meta_pb,
                 "theory_gpu": _meta_or_skip(th_gpu_meta_pb),
+                "dataset_gpu": ds_gpu_meta_pb,
                 "speedup_cpu_vs_ml":  _speedup(ml_meta_pb, th_meta_pb),
                 "speedup_gpu_vs_ml":  _speedup(ml_meta_pb, _meta_or_skip(th_gpu_meta_pb)),
                 "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_pb), th_meta_pb),
@@ -791,6 +974,7 @@ def main():
                 "ml":         ml_meta_pbc,
                 "theory_cpu": th_meta_pbc,
                 "theory_gpu": _meta_or_skip(th_gpu_meta_pbc),
+                "dataset_gpu": ds_gpu_meta_pbc,
                 "speedup_cpu_vs_ml":  _speedup(ml_meta_pbc, th_meta_pbc),
                 "speedup_gpu_vs_ml":  _speedup(ml_meta_pbc, _meta_or_skip(th_gpu_meta_pbc)),
                 "speedup_gpu_vs_cpu": _speedup(_meta_or_skip(th_gpu_meta_pbc), th_meta_pbc),

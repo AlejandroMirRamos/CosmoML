@@ -229,6 +229,7 @@ def _render_getdist(
         settings={"smooth_scale_2D": smooth_scale, "smooth_scale_1D": smooth_scale},
     )
     g = getdist.plots.get_subplot_plotter()
+    matplotlib.rcParams["text.usetex"] = False  # Planck style enables usetex; force off (no LaTeX installed)
     g.triangle_plot(
         mc,
         filled=True,

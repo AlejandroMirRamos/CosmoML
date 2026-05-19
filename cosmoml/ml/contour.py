@@ -121,7 +121,7 @@ def plot_contour_2d(
                             kwargs[f] = fixed[f]
                     tasks.append((theory_fn, i, j, kwargs))
 
-        n_cores = max(1, multiprocessing.cpu_count() - 1)
+        n_cores = min(16, max(1, multiprocessing.cpu_count() - 1))
         if tasks:
             for i_idx, j_idx, val in Parallel(n_jobs=n_cores)(
                 delayed(_eval_point)(t) for t in tasks

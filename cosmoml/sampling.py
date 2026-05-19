@@ -125,7 +125,7 @@ def build_chi2_dataset(
     samples = {p: np.concatenate([b[p] for b in blocks]) for p in param_names}
     total = len(next(iter(samples.values())))
 
-    n_cores = max(1, multiprocessing.cpu_count() - 1)
+    n_cores = min(16, max(1, multiprocessing.cpu_count() - 1))
     print(f"Evaluating chi2 at {total} points across {n_cores} cores...")
 
     tasks = [(chi2_fn, {p: float(samples[p][i]) for p in param_names})

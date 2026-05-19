@@ -1,10 +1,5 @@
-# ── Figuras (regenerables) ────────────────────────────────────────────────
-outputs/figures/**/*.png
-
-# ── Outputs binarios grandes (modelos y chains, regenerables) ────────────
-outputs/models/
-outputs/chains/
-outputs/datasets/
+# ── Outputs (todos regenerables) ─────────────────────────────────────────
+outputs/
 data/des/DES-SN5YR-1.2.zip
 
 # ── Python ────────────────────────────────────────────────────────────────

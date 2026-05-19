@@ -96,12 +96,18 @@ def _parallel_mcmc(
     seed: int,
     ess_target: int | None = 5_000,
     progress_every: int = 200,
+    proposal_cov: np.ndarray | None = None,
 ) -> np.ndarray:
     """n_chains independent RW-MH chains, one batched predict per step.
 
     Phase 1 (0..burn_in):  diagonal proposal, adaptive step size.
+                           Skipped if proposal_cov is given — uses it directly.
     Phase 2 (burn_in..):   multivariate Gaussian from empirical covariance,
                            handles correlated posteriors (e.g. w0-wa).
+
+    proposal_cov: optional Hessian covariance (e.g. from Minuit). When provided
+    the diagonal phase is skipped and the chain starts with a well-oriented
+    proposal, which is critical for degenerate posteriors (e.g. BAO-only w0-wa).
 
     ess_target: stop early once ESS ≥ ess_target (checked every progress_every
     steps). Set to None to always run the full n_steps.
@@ -121,7 +127,13 @@ def _parallel_mcmc(
     chain[0] = pos
 
     step_scale = 0.05 * (highs - lows)
-    L = None  # Cholesky of proposal cov — set at burn_in
+    L = None  # Cholesky of proposal cov — set at burn_in (or immediately if proposal_cov given)
+    if proposal_cov is not None:
+        try:
+            L = np.linalg.cholesky(np.array(proposal_cov, dtype=float))
+            print(f"  proposal_cov: Hessian covariance accepted — skipping diagonal phase")
+        except np.linalg.LinAlgError:
+            print("  proposal_cov: Cholesky failed — falling back to diagonal phase")
     n_accepted = 0
     t0 = time.time()
     stopped_at = n_steps
@@ -272,6 +284,7 @@ def plot_corner_marginal(
     ess_target: int | None = 5_000,
     n_trees: int | None = None,
     seed: int = 42,
+    proposal_cov: np.ndarray | None = None,
     smooth_scale: float = 0.5,
     save_path: str | Path | None = None,
     show: bool = True,
@@ -339,6 +352,7 @@ def plot_corner_marginal(
         predict_fn, lows, highs, center, ndim,
         n_chains, n_steps, burn_in, seed,
         ess_target=ess_target,
+        proposal_cov=proposal_cov,
     )
 
     fig = _render_getdist(samples, features, str_labels, markers, title, smooth_scale,

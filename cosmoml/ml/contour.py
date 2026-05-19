@@ -7,8 +7,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
-import concurrent.futures
 import multiprocessing
+
+from joblib import Parallel, delayed
 
 from ..config import CONF_LEVELS_2D
 
@@ -122,9 +123,10 @@ def plot_contour_2d(
 
         n_cores = max(1, multiprocessing.cpu_count() - 1)
         if tasks:
-            with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as executor:
-                for i_idx, j_idx, val in executor.map(_eval_point, tasks):
-                    Z_th[i_idx:i_idx + theory_step, j_idx:j_idx + theory_step] = val
+            for i_idx, j_idx, val in Parallel(n_jobs=n_cores)(
+                delayed(_eval_point)(t) for t in tasks
+            ):
+                Z_th[i_idx:i_idx + theory_step, j_idx:j_idx + theory_step] = val
 
         t_th = time.time() - t0
 

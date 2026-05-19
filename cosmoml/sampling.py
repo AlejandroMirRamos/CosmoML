@@ -14,8 +14,8 @@ from pathlib import Path
 import time
 import numpy as np
 import pandas as pd
-import concurrent.futures
 import multiprocessing
+from joblib import Parallel, delayed
 
 
 def _sample_uniform(spec: dict[str, tuple[float, float] | float], n: int,
@@ -45,6 +45,7 @@ def build_chi2_dataset(
     n_random: int = 30000,
     anchor: dict | None = None,
     n_anchor: int = 0,
+    gaussian_clouds: list[dict] | None = None,
     seed: int = 0,
     save_to: str | Path | None = None,
     progress_every: int = 2000,
@@ -68,6 +69,12 @@ def build_chi2_dataset(
         Cloud size.
     anchor : dict
         ``{param: constant}`` for the best-fit row, repeated `n_anchor` times.
+    gaussian_clouds : list[dict] | None
+        Each dict: ``{'center': {param: val}, 'sigma': {param: val}, 'n': int,
+        'bounds': {param: (lo, hi)}}``. Samples N points from an isotropic
+        Gaussian and clips them to ``bounds`` (defaults to `random_box` bounds).
+        Use this to enrich coverage near the posterior for flat/degenerate
+        chi2 surfaces (e.g. BAO-only).
     seed : int
         RNG seed.
     save_to : str | Path
@@ -86,6 +93,35 @@ def build_chi2_dataset(
     if random_box is not None and n_random > 0:
         blocks.append(_sample_uniform(random_box, n_random, rng))
 
+    for gc in gaussian_clouds or []:
+        n_gc = int(gc['n'])
+        center = gc['center']
+        bounds = gc.get('bounds', random_box or {})
+        mean_vec = np.array([float(center[p]) for p in param_names])
+        if 'cov' in gc:
+            # Correlated multivariate Gaussian using the Hessian covariance.
+            # scale² multiplies the covariance so that the cloud covers ~scale σ.
+            scale = float(gc.get('scale', 1.0))
+            cov_mat = np.array(gc['cov']) * scale ** 2
+            drawn = rng.multivariate_normal(mean_vec, cov_mat, n_gc)
+            raw = {p: drawn[:, j] for j, p in enumerate(param_names)}
+            sigma_diag = np.sqrt(np.diag(cov_mat))
+            desc = ', '.join(f'{p}={center[p]:.3f}±{s:.3f}' for p, s in zip(param_names, sigma_diag))
+            print(f"  gaussian_cloud (correlated, scale={scale}): {n_gc} pts — {desc}")
+        else:
+            sigma = gc['sigma']
+            raw = {
+                p: rng.normal(float(center[p]), float(sigma[p]), n_gc)
+                for p in param_names
+            }
+            desc = ', '.join(f'{p}={center[p]:.3f}±{sigma[p]:.3f}' for p in param_names)
+            print(f"  gaussian_cloud (diagonal): {n_gc} pts — {desc}")
+        if bounds:
+            for p in param_names:
+                lo, hi = bounds[p]
+                raw[p] = np.clip(raw[p], lo, hi)
+        blocks.append(raw)
+
     samples = {p: np.concatenate([b[p] for b in blocks]) for p in param_names}
     total = len(next(iter(samples.values())))
 
@@ -95,22 +131,15 @@ def build_chi2_dataset(
     tasks = [(chi2_fn, {p: float(samples[p][i]) for p in param_names})
              for i in range(total)]
 
-    chi2s = np.empty(total)
     t0 = time.time()
-    last_report = 0
-    with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as executor:
-        # executor.map preserves submission order, so the index i matches tasks[i]
-        for i, val in enumerate(executor.map(_chi2_worker, tasks, chunksize=100)):
-            chi2s[i] = val
-            done = i + 1
-            if progress_every and done - last_report >= progress_every:
-                elapsed = time.time() - t0
-                rate = done / elapsed if elapsed > 0 else 0.0
-                eta = (total - done) / rate if rate > 0 else 0.0
-                print(f"  {done:>7d}/{total} ({100*done/total:5.1f}%) | "
-                      f"elapsed {elapsed:6.1f}s | ETA {eta:6.1f}s | "
-                      f"{rate:6.0f} pts/s")
-                last_report = done
+    # Use joblib (loky backend) to avoid CUDA+fork incompatibility.
+    # loky spawns workers fresh and uses cloudpickle, so notebook-defined
+    # functions are serializable even after CUDA has been initialized.
+    chi2s = np.array(
+        Parallel(n_jobs=n_cores, verbose=5)(
+            delayed(_chi2_worker)(task) for task in tasks
+        )
+    )
     print(f"  done in {time.time() - t0:.1f}s")
 
     df = pd.DataFrame({**samples, "chi2": chi2s})

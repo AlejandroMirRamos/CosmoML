@@ -17,6 +17,7 @@ import numpy as np
 
 try:
     import jax
+    jax.config.update("jax_enable_x64", True)
     import jax.numpy as jnp
     _JAX_OK = True
 except ImportError:
@@ -73,23 +74,23 @@ def make_chi2_gpu_fn(panth=None, bao=None,
         raise ValueError("At least one of panth or bao must be provided.")
 
     # ── Fixed integration grid (built once, treated as constants in JIT) ───────
-    z_grid_np = np.linspace(0.0, Z_MAX, N_GRID, dtype=np.float32)
+    z_grid_np = np.linspace(0.0, Z_MAX, N_GRID, dtype=np.float64)
     z_grid    = jnp.array(z_grid_np)
     dz        = float(Z_MAX / (N_GRID - 1))
 
     # ── SNe static arrays ──────────────────────────────────────────────────────
     if panth is not None:
-        _z_sne     = jnp.array(panth.z_hd,   dtype=jnp.float32)
-        _z_hel_sne = jnp.array(panth.z_hel,  dtype=jnp.float32)
-        _mb_sne    = jnp.array(panth.mb,      dtype=jnp.float32)
-        _inv_cov_s = jnp.array(panth.inv_cov, dtype=jnp.float32)
+        _z_sne     = jnp.array(panth.z_hd,   dtype=jnp.float64)
+        _z_hel_sne = jnp.array(panth.z_hel,  dtype=jnp.float64)
+        _mb_sne    = jnp.array(panth.mb,      dtype=jnp.float64)
+        _inv_cov_s = jnp.array(panth.inv_cov, dtype=jnp.float64)
         _s_inv_cov = float(panth.sum_inv_cov)  # = 1^T C^-1 1
 
     # ── BAO static arrays ──────────────────────────────────────────────────────
     if bao is not None:
-        _z_bao     = jnp.array(bao.z,       dtype=jnp.float32)
-        _val_bao   = jnp.array(bao.val,     dtype=jnp.float32)
-        _inv_cov_b = jnp.array(bao.inv_cov, dtype=jnp.float32)
+        _z_bao     = jnp.array(bao.z,       dtype=jnp.float64)
+        _val_bao   = jnp.array(bao.val,     dtype=jnp.float64)
+        _inv_cov_b = jnp.array(bao.inv_cov, dtype=jnp.float64)
         _type_int  = jnp.array(_encode_types(bao.type), dtype=jnp.int32)
         _rd_f      = float(rd)
 
@@ -157,11 +158,11 @@ def make_chi2_gpu_fn(panth=None, bao=None,
 
     def predict_fn(arr: np.ndarray) -> np.ndarray:
         """arr: (N, 4) — columns [Om, H0, w0, wa]. Returns chi2 array (N,)."""
-        x = jnp.array(arr, dtype=jnp.float32)
+        x = jnp.array(arr, dtype=jnp.float64)
         return np.asarray(_chi2_batched(x[:, 0], x[:, 1], x[:, 2], x[:, 3]))
 
     # Warm-up: trigger JIT compilation now so it is not counted in the benchmark
-    _dummy = np.array([[0.3, 68.0, -1.0, 0.0]], dtype=np.float32)
+    _dummy = np.array([[0.3, 68.0, -1.0, 0.0]], dtype=np.float64)
     predict_fn(_dummy)
 
     return predict_fn

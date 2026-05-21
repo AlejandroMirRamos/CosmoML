@@ -17,18 +17,13 @@ import numpy as np
 
 try:
     import jax
-    jax.config.update("jax_enable_x64", True)
     import jax.numpy as jnp
     _JAX_OK = True
 except ImportError:
     _JAX_OK = False
 
-from ..config import (
-    C_LIGHT,
-    PLANCK_H0, PLANCK_H0_ERR,
-    PLANCK_OM, PLANCK_OM_ERR,
-    PLANCK_RD,
-)
+from ..config import C_LIGHT, PLANCK_RD, PLANCK_H0, PLANCK_OM, PLANCK_CMB_W0, PLANCK_CMB_WA
+from ..priors import _build_cmb_inv_cov
 
 N_GRID = 500
 Z_MAX  = 2.6   # safely above max DESI BAO z (~2.33)
@@ -74,29 +69,34 @@ def make_chi2_gpu_fn(panth=None, bao=None,
         raise ValueError("At least one of panth or bao must be provided.")
 
     # ── Fixed integration grid (built once, treated as constants in JIT) ───────
-    z_grid_np = np.linspace(0.0, Z_MAX, N_GRID, dtype=np.float64)
+    z_grid_np = np.linspace(0.0, Z_MAX, N_GRID, dtype=np.float32)
     z_grid    = jnp.array(z_grid_np)
     dz        = float(Z_MAX / (N_GRID - 1))
 
     # ── SNe static arrays ──────────────────────────────────────────────────────
     if panth is not None:
-        _z_sne     = jnp.array(panth.z_hd,   dtype=jnp.float64)
-        _z_hel_sne = jnp.array(panth.z_hel,  dtype=jnp.float64)
-        _mb_sne    = jnp.array(panth.mb,      dtype=jnp.float64)
-        _inv_cov_s = jnp.array(panth.inv_cov, dtype=jnp.float64)
+        _z_sne     = jnp.array(panth.z_hd,   dtype=jnp.float32)
+        _z_hel_sne = jnp.array(panth.z_hel,  dtype=jnp.float32)
+        _mb_sne    = jnp.array(panth.mb,      dtype=jnp.float32)
+        _inv_cov_s = jnp.array(panth.inv_cov, dtype=jnp.float32)
         _s_inv_cov = float(panth.sum_inv_cov)  # = 1^T C^-1 1
 
     # ── BAO static arrays ──────────────────────────────────────────────────────
     if bao is not None:
-        _z_bao     = jnp.array(bao.z,       dtype=jnp.float64)
-        _val_bao   = jnp.array(bao.val,     dtype=jnp.float64)
-        _inv_cov_b = jnp.array(bao.inv_cov, dtype=jnp.float64)
+        _z_bao     = jnp.array(bao.z,       dtype=jnp.float32)
+        _val_bao   = jnp.array(bao.val,     dtype=jnp.float32)
+        _inv_cov_b = jnp.array(bao.inv_cov, dtype=jnp.float32)
         _type_int  = jnp.array(_encode_types(bao.type), dtype=jnp.int32)
         _rd_f      = float(rd)
 
-    # ── Planck prior constants ─────────────────────────────────────────────────
-    _H0_mu, _H0_sig = float(PLANCK_H0), float(PLANCK_H0_ERR)
-    _Om_mu, _Om_sig = float(PLANCK_OM), float(PLANCK_OM_ERR)
+    # ── CMB covariance-matrix prior constants (precomputed at factory time) ───
+    if planck_prior:
+        _inv_cov_np  = _build_cmb_inv_cov()                # (4, 4) numpy array
+        _inv_cov_jax = jnp.array(_inv_cov_np)
+        _H0_bf       = float(PLANCK_H0)
+        _omega_m_bf  = float(PLANCK_OM * (PLANCK_H0 / 100.0) ** 2)
+        _w0_bf       = float(PLANCK_CMB_W0)
+        _wa_bf       = float(PLANCK_CMB_WA)
 
     # ── Core function (scalar params → scalar chi2) ────────────────────────────
     @jax.jit
@@ -144,10 +144,17 @@ def make_chi2_gpu_fn(panth=None, bao=None,
         else:
             chi2_b = 0.0
 
-        # 5. Planck Gaussian priors on H0 and Om
+        # 5. CMB prior: chi2 = Delta^T InvCov Delta
+        #    Delta = (H0 - H0_bf, omega_m - omega_m_bf, w0 - w0_bf, wa - wa_bf)
         if planck_prior:
-            chi2_p = (((H0 - _H0_mu) / _H0_sig) ** 2
-                      + ((Om - _Om_mu) / _Om_sig) ** 2)
+            omega_m    = Om * (H0 / 100.0) ** 2
+            delta_cmb  = jnp.stack([
+                H0 - _H0_bf,
+                omega_m - _omega_m_bf,
+                w0 - _w0_bf,
+                wa - _wa_bf,
+            ])
+            chi2_p = delta_cmb @ _inv_cov_jax @ delta_cmb
         else:
             chi2_p = 0.0
 
@@ -158,11 +165,11 @@ def make_chi2_gpu_fn(panth=None, bao=None,
 
     def predict_fn(arr: np.ndarray) -> np.ndarray:
         """arr: (N, 4) — columns [Om, H0, w0, wa]. Returns chi2 array (N,)."""
-        x = jnp.array(arr, dtype=jnp.float64)
+        x = jnp.array(arr, dtype=jnp.float32)
         return np.asarray(_chi2_batched(x[:, 0], x[:, 1], x[:, 2], x[:, 3]))
 
     # Warm-up: trigger JIT compilation now so it is not counted in the benchmark
-    _dummy = np.array([[0.3, 68.0, -1.0, 0.0]], dtype=np.float64)
+    _dummy = np.array([[0.3, 68.0, -1.0, 0.0]], dtype=np.float32)
     predict_fn(_dummy)
 
     return predict_fn

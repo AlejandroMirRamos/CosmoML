@@ -15,11 +15,10 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import (
-    C_LIGHT,
-    PLANCK_H0, PLANCK_H0_ERR,
-    PLANCK_OM, PLANCK_OM_ERR,
-    PLANCK_RD,
+    C_LIGHT, PLANCK_RD,
+    PLANCK_H0, PLANCK_OM, PLANCK_CMB_W0, PLANCK_CMB_WA,
 )
+from ..priors import _build_cmb_inv_cov
 
 N_GRID = 500
 Z_MAX  = 2.6
@@ -69,8 +68,13 @@ def make_chi2_numpy_fn(panth=None, bao=None,
         _t_b   = ((_z_bao - z_grid[_idx_b - 1])
                   / (z_grid[_idx_b] - z_grid[_idx_b - 1]))
 
-    _H0_mu, _H0_sig = float(PLANCK_H0), float(PLANCK_H0_ERR)
-    _Om_mu, _Om_sig = float(PLANCK_OM), float(PLANCK_OM_ERR)
+    # Precompute CMB inverse-covariance and best-fit omega_m once at factory time.
+    if planck_prior:
+        _cmb_inv_cov  = _build_cmb_inv_cov()
+        _omega_m_bf   = float(PLANCK_OM * (PLANCK_H0 / 100.0) ** 2)
+        _H0_bf        = float(PLANCK_H0)
+        _w0_bf        = float(PLANCK_CMB_W0)
+        _wa_bf        = float(PLANCK_CMB_WA)
 
     def predict_fn(arr: np.ndarray) -> np.ndarray:
         arr = np.asarray(arr, dtype=np.float64)
@@ -125,10 +129,17 @@ def make_chi2_numpy_fn(panth=None, bao=None,
             x_b     = diff @ _inv_cov_b                   # (N, B)
             chi2   += np.sum(x_b * diff, axis=1)
 
-        # Planck Gaussian priors
+        # CMB covariance-matrix prior: chi2 = Delta^T InvCov Delta
+        # Delta = (H0 - H0_bf, omega_m - omega_m_bf, w0 - w0_bf, wa - wa_bf)
         if planck_prior:
-            chi2 += (((H0 - _H0_mu) / _H0_sig) ** 2
-                     + ((Om - _Om_mu) / _Om_sig) ** 2)
+            omega_m   = Om * (H0 / 100.0) ** 2
+            delta_cmb = np.stack([
+                H0 - _H0_bf,
+                omega_m - _omega_m_bf,
+                w0 - _w0_bf,
+                wa - _wa_bf,
+            ], axis=1)                                  # (N, 4)
+            chi2 += np.einsum('ni,ij,nj->n', delta_cmb, _cmb_inv_cov, delta_cmb)
 
         return chi2
 

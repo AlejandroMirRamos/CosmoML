@@ -18,6 +18,11 @@ PLANCK_RD_ERR = 0.26
 PLANCK_H0_ERR = 0.54
 PLANCK_OM_ERR = 0.0073
 
+# CMB best-fit values used as the centre of the covariance-matrix prior
+# (Planck PR4 + lensing, CPL parameterisation).
+PLANCK_CMB_W0 = -1.0   # w0 CMB best-fit (Planck alone ≈ ΛCDM)
+PLANCK_CMB_WA = 0.0    # wa CMB best-fit
+
 # Delta-chi2 levels for 2D contours (1-sigma and 2-sigma with 2 dof).
 CONF_LEVELS_2D = (2.30, 6.18)
 

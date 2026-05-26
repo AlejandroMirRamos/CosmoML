@@ -7,7 +7,8 @@ from .curve import plot_learning_curve
 from .shap_utils import (
     explain, shap_summary, shap_waterfall, shap_dependence_all, shap_dependence,
 )
-from .marginal import plot_corner_marginal
+from .marginal import plot_corner_marginal, run_mcmc_and_getdist, plot_getdist_comparison
+from .pipeline import locate_bestfit, build_pipeline_dataset, train_and_shap
 
 
 def use_paper_style() -> None:
@@ -22,6 +23,7 @@ __all__ = [
     "plot_learning_curve",
     "explain", "shap_summary", "shap_waterfall", "shap_dependence_all",
     "shap_dependence",
-    "plot_corner_marginal",
+    "plot_corner_marginal", "run_mcmc_and_getdist", "plot_getdist_comparison",
+    "locate_bestfit", "build_pipeline_dataset", "train_and_shap",
     "use_paper_style",
 ]

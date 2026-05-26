@@ -269,6 +269,153 @@ def _render_getdist(
 # Public API
 # ---------------------------------------------------------------------------
 
+def _make_gpu_predict_fn(model, n_trees: int = 0):
+    """GPU booster predict function from a trained model."""
+    from .train import LogChi2Model
+
+    irange = (0, n_trees) if n_trees > 0 else (0, 0)
+    if isinstance(model, LogChi2Model):
+        booster = model.raw_model.get_booster().copy()
+        booster.set_param({"device": "cuda"})
+        y_min = model.y_min
+        def predict_fn(arr: np.ndarray) -> np.ndarray:
+            log_y = booster.inplace_predict(arr.astype(np.float32), iteration_range=irange)
+            return (10.0 ** log_y) - 1.0 + y_min
+    else:
+        booster = model.get_booster().copy()
+        booster.set_param({"device": "cuda"})
+        def predict_fn(arr: np.ndarray) -> np.ndarray:
+            return booster.inplace_predict(arr.astype(np.float32), iteration_range=irange)
+    return predict_fn
+
+
+def run_mcmc_and_getdist(
+    model,
+    features: list[str],
+    ranges: dict,
+    ref: dict,
+    section: str,
+    labels: dict[str, str],
+    *,
+    markers: dict[str, float] | None = None,
+    title: str = "",
+    proposal_cov: np.ndarray | None = None,
+    n_trees_mcmc: int = 0,
+    ess_target: int = 10_000,
+    figures_dir=None,
+    show: bool = True,
+) -> np.ndarray:
+    """Run GPU-boosted MCMC and render a getdist corner plot.
+
+    Parameters
+    ----------
+    model : LogChi2Model or XGBRegressor
+    features, ranges, ref : parameter names, bounds, best-fit
+    section : prefix used for the saved figure filename
+    labels : dict param -> LaTeX label
+    figures_dir : Path or None — if set, saves PNG there
+    """
+    import pathlib
+
+    lows   = np.array([ranges[f][0] for f in features])
+    highs  = np.array([ranges[f][1] for f in features])
+    center = np.array([ref[f] for f in features])
+    str_labels = [(labels[f] if labels and f in labels else f).replace("$", "")
+                  for f in features]
+
+    predict_fn = _make_gpu_predict_fn(model, n_trees=n_trees_mcmc)
+    samples = _parallel_mcmc(
+        predict_fn, lows, highs, center, len(features),
+        n_chains=1024, n_steps=10_000, burn_in=500, seed=42,
+        ess_target=ess_target, proposal_cov=proposal_cov,
+    )
+
+    fig = _render_getdist(samples, features, str_labels, markers, title,
+                          smooth_scale=0.5, ranges=ranges)
+    if figures_dir is not None:
+        save_path = pathlib.Path(figures_dir) / f"{section}_getdist.png"
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=200, bbox_inches="tight")
+        print(f"  Saved: {save_path}")
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+    return samples
+
+
+def plot_getdist_comparison(
+    samples_list: list[np.ndarray],
+    dataset_labels: list[str],
+    features: list[str],
+    labels: dict[str, str],
+    *,
+    markers: dict[str, float] | None = None,
+    title: str = "",
+    save_path=None,
+    filled: list[bool] | bool | None = None,
+    ranges: dict | None = None,
+    show: bool = True,
+) -> matplotlib.figure.Figure:
+    """Overlay multiple MCMC chains in one getdist triangle plot."""
+    try:
+        import getdist
+        import getdist.plots
+    except ImportError as e:
+        raise ImportError("getdist required: pip install getdist") from e
+
+    import pathlib
+
+    COLORS = ["#0044cc", "#cc0000", "#009933", "#cc6600"]
+    n = len(samples_list)
+    if filled is None:
+        filled = [True] + [False] * (n - 1)
+    elif isinstance(filled, bool):
+        filled = [filled] * n
+
+    str_labels = [(labels[f] if labels and f in labels else f).replace("$", "")
+                  for f in features]
+    mc_ranges = {f: list(r) for f, r in ranges.items()} if ranges else None
+    mc_list = [
+        getdist.MCSamples(
+            samples=s, names=features, labels=str_labels, label=dl,
+            ranges=mc_ranges,
+            settings={"smooth_scale_2D": 0.5, "smooth_scale_1D": 0.5},
+        )
+        for s, dl in zip(samples_list, dataset_labels)
+    ]
+    g = getdist.plots.get_subplot_plotter()
+    matplotlib.rcParams["text.usetex"] = False
+    g.triangle_plot(
+        mc_list, filled=filled, contour_colors=COLORS[:n],
+        contour_lws=[2.0] * n, markers=markers,
+        marker_args={"ls": "--", "color": "gray", "lw": 1.5, "alpha": 0.8}
+        if markers else None,
+        legend_labels=dataset_labels, legend_loc="upper right",
+    )
+    if ranges:
+        for i, fi in enumerate(features):
+            for j, fj in enumerate(features[:i + 1]):
+                ax = g.subplots[i][j]
+                if ax is None:
+                    continue
+                ax.set_xlim(*ranges[fj])
+                if i != j:
+                    ax.set_ylim(*ranges[fi])
+    if title:
+        g.fig.suptitle(title, fontsize=13, y=1.01)
+    if save_path is not None:
+        sp = pathlib.Path(save_path)
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        g.fig.savefig(sp, dpi=200, bbox_inches="tight")
+        print(f"  Saved: {sp}")
+    if show:
+        plt.show()
+    else:
+        plt.close(g.fig)
+    return g.fig
+
+
 def plot_corner_marginal(
     model,
     features: list[str],

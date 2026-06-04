@@ -35,7 +35,7 @@ DEFAULT_XGB_PARAMS = dict(
     max_depth=6,
     tree_method="hist",
     eval_metric="rmse",
-    n_jobs=-1,
+    n_jobs=16,
 )
 
 # Early stopping: stop when validation has not improved by at least MIN_DELTA

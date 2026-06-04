@@ -5,6 +5,9 @@ outputs/figures/**/*.png
 outputs/models/
 outputs/chains/
 outputs/datasets/
+outputs/paper/chains/
+outputs/paper/models/
+outputs/paper/datasets/
 data/des/DES-SN5YR-1.2.zip
 
 # ── Python ────────────────────────────────────────────────────────────────

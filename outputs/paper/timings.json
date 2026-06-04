@@ -1,0 +1,122 @@
+{
+  "ml_engine": "RWMH 1024 chains, XGBoost GPU booster (LogChi2)",
+  "theory_cpu_engine": "RWMH 1024 chains, ProcessPoolExecutor exact chi2",
+  "theory_gpu_engine": "RWMH 1024 chains, JAX vmap GPU exact chi2",
+  "dataset_gpu_engine": "JAX vmap GPU batch, same sampling as CPU (seed=42)",
+  "common": {
+    "n_chains": 1024,
+    "n_steps_cap": 10000,
+    "burn_in": 500,
+    "seed": 42,
+    "ess_target": 10000,
+    "theory_cpu_note": "panth scenarios use 32 chains x 2000 steps"
+  },
+  "runs": {
+    "bao_only": {
+      "ml": {
+        "cached": true,
+        "wall_s": null,
+        "n_samples": 3994624
+      },
+      "theory_np": {
+        "cached": false,
+        "wall_s": 135.12,
+        "n_samples": 6247424
+      },
+      "theory_cpu": {
+        "cached": true,
+        "wall_s": null,
+        "n_samples": 8705024
+      },
+      "theory_gpu": {
+        "cached": false,
+        "wall_s": 283.06,
+        "n_samples": 9728000
+      },
+      "dataset_gpu": {
+        "gpu_wall_s": 0.94,
+        "cpu_sample_s": 4.0,
+        "cpu_extrap_s": 159.9,
+        "speedup": 170.9,
+        "n_pts": 200000,
+        "comparison": {
+          "n": 200000,
+          "max_abs_diff": 569.0737906121649,
+          "mean_abs_diff": 3.670690056136933,
+          "max_rel_diff": 0.0005337215171286343
+        }
+      },
+      "speedup_cpu_vs_ml": null,
+      "speedup_gpu_vs_ml": null,
+      "speedup_gpu_vs_cpu": null
+    },
+    "panth_bao": {
+      "ml": {
+        "cached": true,
+        "wall_s": null,
+        "n_samples": null
+      },
+      "theory_np": {
+        "cached": false,
+        "wall_s": 249.85,
+        "n_samples": 922624
+      },
+      "theory_cpu": {
+        "cached": false,
+        "wall_s": null,
+        "n_samples": null,
+        "skipped": true
+      },
+      "theory_gpu": {
+        "cached": false,
+        "wall_s": 306.46,
+        "n_samples": 9728000
+      },
+      "dataset_gpu": {
+        "gpu_wall_s": 65.85,
+        "cpu_sample_s": 110.05,
+        "cpu_extrap_s": 4402.2,
+        "speedup": 66.8,
+        "n_pts": 200000,
+        "comparison": {}
+      },
+      "speedup_cpu_vs_ml": null,
+      "speedup_gpu_vs_ml": null,
+      "speedup_gpu_vs_cpu": null
+    },
+    "panth_bao_cmb": {
+      "ml": {
+        "cached": true,
+        "wall_s": null,
+        "n_samples": null
+      },
+      "theory_np": {
+        "cached": false,
+        "wall_s": 248.96,
+        "n_samples": 922624
+      },
+      "theory_cpu": {
+        "cached": false,
+        "wall_s": null,
+        "n_samples": null,
+        "skipped": true
+      },
+      "theory_gpu": {
+        "cached": false,
+        "wall_s": 143.55,
+        "n_samples": 9728000
+      },
+      "dataset_gpu": {
+        "gpu_wall_s": 1.09,
+        "cpu_sample_s": 107.52,
+        "cpu_extrap_s": 4300.7,
+        "speedup": 3946.2,
+        "n_pts": 200000,
+        "comparison": {}
+      },
+      "speedup_cpu_vs_ml": null,
+      "speedup_gpu_vs_ml": null,
+      "speedup_gpu_vs_cpu": null
+    }
+  }
+}

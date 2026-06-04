@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cosmoml"
 version = "0.1.0"
-description = "Análisis ML (XGBoost + SHAP) sobre likelihoods cosmológicos: SNe Ia (Pantheon+/DES) y BAO (DESI)."
+description = "ML analysis (XGBoost + SHAP) of cosmological likelihoods: SNe Ia (Pantheon+/DES) and BAO (DESI)."
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",

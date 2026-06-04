@@ -14,6 +14,7 @@ ML analysis (XGBoost + SHAP) of cosmological likelihoods: Type Ia supernovae
 | 04 | [Joint SNe + BAO](notebooks/04_SN+BAO.ipynb) | [4.1 Joint w₀wₐCDM 4D](notebooks/04_SN+BAO.ipynb#4-1) · [4.2 SNe vs BAO Ωm=0.40 prior](notebooks/04_SN+BAO.ipynb#4-2) · [4.3 w₀–wₐ overlay ellipses](notebooks/04_SN+BAO.ipynb#4-3) · [4.4 1D constraint wₐ](notebooks/04_SN+BAO.ipynb#4-4) |
 | 05 | [Special paper figures](notebooks/05_Figures.ipynb) | [5.1 Fig 8 — ΛCDM BAO (Ωm, H0·rd)](notebooks/05_Figures.ipynb#5-1) · [5.2 Fig 12 — wCDM overlay 3 datasets](notebooks/05_Figures.ipynb#5-2) · [5.3 Fig 13 — μ(z) residuals](notebooks/05_Figures.ipynb#5-3) · [5.4 ML test: CPL vs Taylor 4th order](notebooks/05_Figures.ipynb#5-4) |
 | 06 | [Paper: full pipeline](notebooks/06_Paper.ipynb) | [6.1 ΛCDM · Pantheon+ + BAO](notebooks/06_Paper.ipynb#section-1) · [6.2.1a w₀wₐCDM · Pantheon+ + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.1b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.2.2a DES-2024 + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.2b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.2.3a DES-2025 + BAO](notebooks/06_Paper.ipynb#section-2) · [6.2.3b + CMB](notebooks/06_Paper.ipynb#section-2) · [6.3 Final summary: BAO / BAO+Pantheon+ / BAO+Pantheon++CMB](notebooks/06_Paper.ipynb#section-3) |
+| 07 | [Benchmark: ML vs Theory](notebooks/07_Benchmark.ipynb) | ML surrogate MCMC vs exact-χ² MCMC on CPU (`ProcessPoolExecutor`) and GPU (JAX `vmap`), plus GPU-vs-CPU dataset generation, across the BAO / +Pantheon+ / +CMB scenarios |
 
 ## Structure
 
@@ -21,7 +22,7 @@ ML analysis (XGBoost + SHAP) of cosmological likelihoods: Type Ia supernovae
 CosmoML/
 ├── cosmoml/            # importable library (shared across all notebooks)
 │   ├── data/          # loaders: pantheon.py, des.py, desi_bao.py
-│   ├── theory/        # χ²: sne.py, bao.py, joint.py
+│   ├── theory/        # χ²: sne.py, bao.py, joint.py, numpy_theory.py, jax_theory.py (GPU)
 │   ├── ml/            # train.py, contour.py, shap_utils.py
 │   ├── sampling.py    # χ² dataset generator (slices + cloud + anchor)
 │   ├── priors.py      # Planck Gaussian priors
@@ -30,14 +31,11 @@ CosmoML/
 │   ├── pantheon/      # Pantheon+SH0ES.dat / .cov
 │   ├── des/           # DES-SN5YR 2024 and 2025
 │   └── desi_bao/      # DESI DR2 mean + cov
-├── outputs/           # generated (gitignored)
-│   ├── datasets/      # χ² CSVs for XGBoost training
-│   ├── figures/       # PNGs per scenario
-│   └── models/        # (optional) cached XGBoost models
-├── notebooks/         # one notebook per scenario
-│   └── figures/       # final paper figures (Fig8, Fig12, Fig13)
-├── scripts/           # headless generators (CLI), optional
-└── legacy/            # archived original scripts (to be deleted after validation)
+├── notebooks/         # one notebook per scenario (01–07)
+└── outputs/           # generated (gitignored)
+    ├── datasets/      # χ² CSVs for XGBoost training
+    ├── figures/       # PNGs per scenario
+    └── models/        # (optional) cached XGBoost models
 ```
 
 ## Design principles
@@ -65,7 +63,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-For GPU support (JAX — optional, needed for `run_cosmo.py` GPU benchmarks):
+For GPU support (JAX — optional, needed for the GPU sections of the 07 benchmark):
 
 ```bash
 pip install "jax[cuda]"          # NVIDIA GPU (CUDA)
@@ -115,9 +113,9 @@ plot_contour_2d(
 )
 ```
 
-## Migration status
+## Status
 
-- ✅ **Phase 1**: library + folder reorganisation (this commit).
-- ✅ **Phase 2**: pilot notebooks 01–04.
-- ✅ **Phase 3**: special figures notebook (05) + full paper pipeline (06).
-- ⏳ **Phase 4**: delete `legacy/` once all scenarios are validated.
+- ✅ Library + folder reorganisation (`cosmoml/`).
+- ✅ Scenario notebooks 01–04.
+- ✅ Special figures (05) + full paper pipeline (06).
+- ✅ ML-vs-theory benchmark (07); legacy scripts removed.

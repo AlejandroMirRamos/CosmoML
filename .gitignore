@@ -25,3 +25,6 @@ venv/
 
 # ── Código legacy ─────────────────────────────────────────────────────────
 legacy/
+
+# local Claude Code settings
+.claude/

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import matplotlib.pyplot as plt
 
+from .style import texify
+
 
 def plot_learning_curve(
     info: dict,
@@ -43,7 +45,7 @@ def plot_learning_curve(
         ax.set_yscale(yscale)
     ax.set_xlabel("Boosting iteration")
     ax.set_ylabel(metric.upper())
-    ax.set_title(title)
+    ax.set_title(texify(title))
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend()
     fig.tight_layout()

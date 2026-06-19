@@ -13,6 +13,8 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
+from .style import texify, style_getdist, reassert_usetex
+
 
 # ---------------------------------------------------------------------------
 # Predict helper
@@ -241,7 +243,8 @@ def _render_getdist(
         settings={"smooth_scale_2D": smooth_scale, "smooth_scale_1D": smooth_scale},
     )
     g = getdist.plots.get_subplot_plotter()
-    matplotlib.rcParams["text.usetex"] = False  # Planck style enables usetex; force off (no LaTeX installed)
+    style_getdist(g)
+    reassert_usetex()  # getdist's style resets text.usetex; restore our choice
     g.triangle_plot(
         mc,
         filled=True,
@@ -261,7 +264,7 @@ def _render_getdist(
                 if i != j:
                     ax.set_ylim(*ranges[features[i]])
     if title:
-        g.fig.suptitle(title, fontsize=12, y=1.01)
+        g.fig.suptitle(texify(title), fontsize=19, y=1.02)
     return g.fig
 
 
@@ -366,7 +369,8 @@ def plot_getdist_comparison(
 
     import pathlib
 
-    COLORS = ["#0044cc", "#cc0000", "#009933", "#cc6600"]
+    COLORS = ["#0044cc", "#cc0000", "#009933", "#cc6600",
+              "#9900cc", "#008080", "#cc0099", "#806000"]
     n = len(samples_list)
     if filled is None:
         filled = [True] + [False] * (n - 1)
@@ -385,7 +389,8 @@ def plot_getdist_comparison(
         for s, dl in zip(samples_list, dataset_labels)
     ]
     g = getdist.plots.get_subplot_plotter()
-    matplotlib.rcParams["text.usetex"] = False
+    style_getdist(g)
+    reassert_usetex()  # getdist's style resets text.usetex; restore our choice
     g.triangle_plot(
         mc_list, filled=filled, contour_colors=COLORS[:n],
         contour_lws=[2.0] * n, markers=markers,
@@ -403,7 +408,7 @@ def plot_getdist_comparison(
                 if i != j:
                     ax.set_ylim(*ranges[fi])
     if title:
-        g.fig.suptitle(title, fontsize=13, y=1.01)
+        g.fig.suptitle(texify(title), fontsize=19, y=1.02)
     if save_path is not None:
         sp = pathlib.Path(save_path)
         sp.parent.mkdir(parents=True, exist_ok=True)

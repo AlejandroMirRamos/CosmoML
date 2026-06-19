@@ -44,7 +44,8 @@ def _encode_types(types: np.ndarray) -> np.ndarray:
 
 def make_chi2_gpu_fn(panth=None, bao=None,
                      planck_prior: bool = False,
-                     rd: float = PLANCK_RD):
+                     rd: float = PLANCK_RD,
+                     batch_size: int = 256):
     """Build a batched, JIT-compiled GPU predict_fn.
 
     Parameters
@@ -59,6 +60,14 @@ def make_chi2_gpu_fn(panth=None, bao=None,
         Add Gaussian Planck priors on H0 and Om.
     rd : float
         Sound horizon in Mpc. Defaults to PLANCK_RD.
+    batch_size : int
+        Max number of parameter sets evaluated per vmap call. The batched
+        kernel is run on sub-blocks of this many rows and the results are
+        concatenated, so the peak GPU memory of a single call is bounded
+        regardless of how many rows ``predict_fn`` receives (the MCMC passes
+        up to ``n_chains`` rows per step). Lower it (e.g. 128) on small GPUs;
+        the result is identical because the vmap is independent per row. Set
+        to 0/None to evaluate the whole batch at once.
 
     Returns
     -------
@@ -168,9 +177,22 @@ def make_chi2_gpu_fn(panth=None, bao=None,
     _chi2_batched = jax.jit(jax.vmap(_chi2_single, in_axes=(0, 0, 0, 0)))
 
     def predict_fn(arr: np.ndarray) -> np.ndarray:
-        """arr: (N, 4) — columns [Om, H0, w0, wa]. Returns chi2 array (N,)."""
-        x = jnp.array(arr, dtype=jnp.float64)
-        return np.asarray(_chi2_batched(x[:, 0], x[:, 1], x[:, 2], x[:, 3]))
+        """arr: (N, 4) — columns [Om, H0, w0, wa]. Returns chi2 array (N,).
+
+        Evaluated in sub-blocks of ``batch_size`` rows so the peak GPU memory of
+        the vmap is bounded (avoids OOM on small cards); identical result since
+        the vmap is row-independent.
+        """
+        x = jnp.asarray(arr, dtype=jnp.float64)
+        n = x.shape[0]
+        if not batch_size or n <= batch_size:
+            return np.asarray(_chi2_batched(x[:, 0], x[:, 1], x[:, 2], x[:, 3]))
+        out = np.empty(n, dtype=np.float64)
+        for s in range(0, n, batch_size):
+            e = min(s + batch_size, n)
+            out[s:e] = np.asarray(
+                _chi2_batched(x[s:e, 0], x[s:e, 1], x[s:e, 2], x[s:e, 3]))
+        return out
 
     # Warm-up: trigger JIT compilation now so it is not counted in the benchmark
     _dummy = np.array([[0.3, 68.0, -1.0, 0.0]], dtype=np.float64)

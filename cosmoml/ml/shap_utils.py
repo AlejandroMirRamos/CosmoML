@@ -13,6 +13,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import shap
 
+from .style import texify, feature_labels
+
 
 def explain(model, X, n_sample: int = 1000, seed: int = 42):
     """Build a TreeExplainer and return (shap_values, X_sampled).
@@ -38,10 +40,12 @@ def shap_summary(
     if save_dir is not None:
         save_dir = Path(save_dir); save_dir.mkdir(parents=True, exist_ok=True)
     shap_v, X_s = explain(model, X, n_sample=n_sample)
+    # LaTeX feature labels (Om -> $\Omega_m$, ...) shown on every downstream plot.
+    shap_v.feature_names = feature_labels(X_s.columns)
 
     plt.figure()
     if title:
-        plt.title(f"{title} (beeswarm)")
+        plt.title(texify(f"{title} (beeswarm)"))
     shap.plots.beeswarm(shap_v, show=False)
     plt.tight_layout()
     if save_dir is not None:
@@ -51,8 +55,10 @@ def shap_summary(
 
     plt.figure()
     if title:
-        plt.title(f"{title} (bar)")
+        plt.title(texify(f"{title} (bar)"))
     shap.plots.bar(shap_v, show=False)
+    # usetex renders a bare '|' as a dash; wrap the abs-value bars in math mode.
+    plt.gca().set_xlabel(r"mean($|$SHAP value$|$)")
     plt.tight_layout()
     if save_dir is not None:
         out_bar = save_dir / f"{prefix}_shap_bar.png"
@@ -72,7 +78,7 @@ def shap_waterfall(
     """Waterfall plot for one sample (per-feature additive decomposition)."""
     plt.figure()
     if title:
-        plt.title(title)
+        plt.title(texify(title))
     shap.plots.waterfall(shap_values[idx], show=False)
     plt.tight_layout()
     if save_path is not None:
@@ -93,9 +99,11 @@ def shap_dependence_all(
     if save_dir is not None:
         save_dir = Path(save_dir); save_dir.mkdir(parents=True, exist_ok=True)
     out_paths = []
-    for col in X.columns:
+    # Slice by integer index: shap_values.feature_names may have been relabelled
+    # to LaTeX, so name-based slicing (e.g. [:, "Om"]) would no longer match.
+    for i, col in enumerate(X.columns):
         plt.figure()
-        shap.plots.scatter(shap_values[:, col], color=shap_values, show=False)
+        shap.plots.scatter(shap_values[:, i], color=shap_values, show=False)
         plt.tight_layout()
         if save_dir is not None:
             out = save_dir / f"{prefix}_shap_{col}.png"

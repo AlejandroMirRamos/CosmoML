@@ -61,6 +61,10 @@ def texify(s: str | None) -> str | None:
         return s
     for uni, tex in _TEX_SUBS:
         s = s.replace(uni, tex)
+    if USETEX:
+        # '&' is the LaTeX alignment-tab character; escape it for text mode so
+        # dataset labels like "Pantheon+ & BAO" don't crash the LaTeX run.
+        s = s.replace("&", r"\&")
     return s
 
 

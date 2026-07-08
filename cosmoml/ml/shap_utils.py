@@ -55,7 +55,7 @@ def shap_summary(
 
     plt.figure()
     if title:
-        plt.title(texify(f"{title} (bar)"))
+        plt.title(texify(title))
     shap.plots.bar(shap_v, show=False)
     # usetex renders a bare '|' as a dash; wrap the abs-value bars in math mode.
     plt.gca().set_xlabel(r"mean($|$SHAP value$|$)")

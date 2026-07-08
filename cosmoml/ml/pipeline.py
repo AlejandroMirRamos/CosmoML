@@ -129,7 +129,7 @@ def train_and_shap(
     plot_learning_curve(info,
         title=f"{title} — Learning Curve (R²={info['r2']:.5f})", show=True)
     shap_v, X_s = shap_summary(model, info["X_val"],
-        title=f"{title} — SHAP", save_dir=figures_dir, prefix=section, show=True)
+        title=title, save_dir=figures_dir, prefix=section, show=True)
     shap_waterfall(shap_v, idx=0, title=f"{title} — SHAP waterfall", show=True)
     shap_dependence_all(shap_v, X_s, save_dir=figures_dir, prefix=section, show=True)
     return model, info, shap_v, X_s

@@ -227,7 +227,17 @@ def _render_getdist(
     title: str,
     smooth_scale: float,
     ranges: dict[str, tuple[float, float]] | None = None,
+    axis_limits: dict[str, tuple[float, float]] | None = None,
+    legend_label: str | None = None,
 ) -> matplotlib.figure.Figure:
+    """Render a getdist triangle plot.
+
+    ``ranges`` are the prior bounds passed to getdist (they drive the KDE
+    boundary correction and hence the contour shape).  ``axis_limits``, when
+    given, only controls the displayed ``set_xlim``/``set_ylim`` window, so the
+    posterior is computed identically and the figure is merely zoomed.
+    ``legend_label`` adds a legend even for a single-dataset plot.
+    """
     try:
         import getdist
         import getdist.plots
@@ -239,6 +249,7 @@ def _render_getdist(
         samples=samples,
         names=features,
         labels=str_labels,
+        label=legend_label,
         ranges=mc_ranges,
         settings={"smooth_scale_2D": smooth_scale, "smooth_scale_1D": smooth_scale},
     )
@@ -253,16 +264,41 @@ def _render_getdist(
         marker_args={"ls": "--", "color": "gray", "lw": 1.5, "alpha": 0.8}
         if markers else None,
     )
-    if ranges:
+    # Display window: axis_limits zooms the view without touching the priors above.
+    lims = axis_limits if axis_limits is not None else ranges
+    if lims:
         ndim = len(features)
         for i in range(ndim):
             for j in range(i + 1):
                 ax = g.subplots[i][j]
                 if ax is None:
                     continue
-                ax.set_xlim(*ranges[features[j]])
+                ax.set_xlim(*lims.get(features[j], ranges[features[j]]))
                 if i != j:
-                    ax.set_ylim(*ranges[features[i]])
+                    ax.set_ylim(*lims.get(features[i], ranges[features[i]]))
+    if legend_label:
+        # Place a compact legend inside the empty upper-right cell of the
+        # triangle (right-most column x top row) so it never overlaps the
+        # marginal panels; long "A & B" / "A + B" labels are wrapped onto two
+        # lines so they stay inside the cell and don't spill over the panels.
+        from matplotlib.patches import Patch
+        disp_label = (legend_label.replace(" & ", "\n& ")
+                                  .replace(" + ", "\n+ "))
+        disp_label = texify(disp_label)
+        handle = Patch(facecolor="#0044cc", edgecolor="none")
+        ndim = len(features)
+        try:
+            pos_top = g.subplots[0][0].get_position()
+            pos_right = g.subplots[ndim - 1][ndim - 1].get_position()
+            legax = g.fig.add_axes([pos_right.x0, pos_top.y0,
+                                    pos_right.width, pos_top.height])
+            legax.axis("off")
+            legax.legend([handle], [disp_label], loc="center", frameon=True,
+                         fontsize=12, handlelength=1.2, handleheight=1.1,
+                         borderpad=0.4)
+        except Exception:
+            g.fig.legend([handle], [disp_label], loc="upper right",
+                         bbox_to_anchor=(0.99, 0.99), frameon=True, fontsize=12)
     if title:
         g.fig.suptitle(texify(title), fontsize=19, y=1.02)
     return g.fig
@@ -306,6 +342,8 @@ def run_mcmc_and_getdist(
     n_trees_mcmc: int = 0,
     ess_target: int = 10_000,
     figures_dir=None,
+    axis_limits: dict | None = None,
+    legend_label: str | None = None,
     show: bool = True,
 ) -> np.ndarray:
     """Run GPU-boosted MCMC and render a getdist corner plot.
@@ -334,7 +372,8 @@ def run_mcmc_and_getdist(
     )
 
     fig = _render_getdist(samples, features, str_labels, markers, title,
-                          smooth_scale=0.5, ranges=ranges)
+                          smooth_scale=0.5, ranges=ranges,
+                          axis_limits=axis_limits, legend_label=legend_label)
     if figures_dir is not None:
         save_path = pathlib.Path(figures_dir) / f"{section}_getdist.png"
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -358,9 +397,14 @@ def plot_getdist_comparison(
     save_path=None,
     filled: list[bool] | bool | None = None,
     ranges: dict | None = None,
+    axis_limits: dict | None = None,
     show: bool = True,
 ) -> matplotlib.figure.Figure:
-    """Overlay multiple MCMC chains in one getdist triangle plot."""
+    """Overlay multiple MCMC chains in one getdist triangle plot.
+
+    ``ranges`` are the getdist priors (contour shape); ``axis_limits`` only
+    zooms the displayed window without changing the computed posteriors.
+    """
     try:
         import getdist
         import getdist.plots
@@ -396,17 +440,18 @@ def plot_getdist_comparison(
         contour_lws=[2.0] * n, markers=markers,
         marker_args={"ls": "--", "color": "gray", "lw": 1.5, "alpha": 0.8}
         if markers else None,
-        legend_labels=dataset_labels, legend_loc="upper right",
+        legend_labels=[texify(dl) for dl in dataset_labels], legend_loc="upper right",
     )
-    if ranges:
+    lims = axis_limits if axis_limits is not None else ranges
+    if lims:
         for i, fi in enumerate(features):
             for j, fj in enumerate(features[:i + 1]):
                 ax = g.subplots[i][j]
                 if ax is None:
                     continue
-                ax.set_xlim(*ranges[fj])
+                ax.set_xlim(*lims.get(fj, ranges[fj]))
                 if i != j:
-                    ax.set_ylim(*ranges[fi])
+                    ax.set_ylim(*lims.get(fi, ranges[fi]))
     if title:
         g.fig.suptitle(texify(title), fontsize=19, y=1.02)
     if save_path is not None:

@@ -1,5 +1,9 @@
 # CosmoML
 
+> **`bonden` branch**: cluster variant of `main` (16-core cap via
+> `n_jobs=16` in `cosmoml/config.py`, no tracked outputs). It carries only
+> the `07_Benchmark` notebook; the scenario notebooks 01–06 live on `main`.
+
 ML analysis (XGBoost + SHAP) of cosmological likelihoods: Type Ia supernovae
 (Pantheon+SH0ES, DES-SN5YR 2024/2025) and BAO (DESI DR2), across multiple models
 (ΛCDM, wCDM, w₀wₐCDM) and dataset combinations (SNe + BAO, optionally with a

@@ -18,10 +18,15 @@ PLANCK_RD_ERR = 0.26
 PLANCK_H0_ERR = 0.54
 PLANCK_OM_ERR = 0.0073
 
-# CMB best-fit values used as the centre of the covariance-matrix prior
-# (Planck PR4 + lensing, CPL parameterisation).
-PLANCK_CMB_W0 = -1.0   # w0 CMB best-fit (Planck alone ≈ ΛCDM)
-PLANCK_CMB_WA = 0.0    # wa CMB best-fit
+# Centre of the compressed CMB Gaussian prior (Planck PR4+lensing, w0waCDM).
+# These are the marginalised means of the PR4+lensing column of the w0waCDM
+# reanalysis (H0=84, w0=-1.28, wa=-1.02; omega_m=omega_b+omega_cdm), NOT the
+# LambdaCDM point. The widths and (crucially) the correlations come from the
+# covariance matrix itself, data/PR4_lensing_CPL.covmat.
+CMB_REF_H0      = 84.0       # H0 [km/s/Mpc]
+CMB_REF_OMEGA_M = 0.14077    # omega_m = omega_b + omega_cdm = 0.02227 + 0.11850
+CMB_REF_W0      = -1.28      # w0
+CMB_REF_WA      = -1.02      # wa
 
 # Delta-chi2 levels for 2D contours (1-sigma and 2-sigma with 2 dof).
 CONF_LEVELS_2D = (2.30, 6.18)

@@ -8,6 +8,8 @@ to sample directly, this application doubles as a controlled validation of the
 emulation method: the surrogate posteriors are checked to be statistically
 indistinguishable from the exact ones (notebook 07).
 
+**Paper:** J. Alda, J. Asorey, A. Mir, S. Peñaranda, *Physically Consistent Parameter Inference: Transparent Machine-Learning Emulation in High Energy Physics and Cosmology*, [Universe **12** (2026) 238](https://doi.org/10.3390/universe12080238) · [arXiv:2607.12726](https://arxiv.org/abs/2607.12726) (Section 3.3, cosmology)
+
 ## Notebooks
 
 | # | Notebook | Scenarios |
@@ -66,10 +68,13 @@ CosmoML/
   validation sets across all data combinations.
 - **Compressed CMB prior** (`cosmoml/priors.py`): instead of recomputing CMB
   spectra, the Planck PR4+lensing constraint enters as a Gaussian prior with a
-  full 4×4 covariance for (H0, ωm, w₀, wₐ), obtained from the published chain
-  covariance by collapsing the (H0, ωb, ωcdm) block onto (H0, ωm) via linear
-  error propagation. The H0–ωm correlation is retained; w₀ and wₐ enter with
-  σ(w₀) = 0.02, σ(wₐ) = 0.05.
+  full 4×4 covariance for (H0, ωm, w₀, wₐ), obtained from the PR4+lensing
+  w₀wₐCDM chain covariance by projecting (ωb, ωcdm) onto ωm = ωb + ωcdm with a
+  linear map, so that every cross-correlation is preserved (ρ(w₀, wₐ) ≈ −0.75,
+  ρ(H0, w₀) ≈ −0.83). The prior is centred on the chain means and the
+  dark-energy sector enters with its genuine widths, σ(w₀) ≈ 0.50 and
+  σ(wₐ) ≈ 1.33 (`cosmoml/data/PR4_lensing_CPL.covmat`; the superseded ΛCDM-like
+  covmat is kept as `PR4_lensing_CPL_old.covmat`).
 - **Posterior sampling**: a parallel Random-Walk Metropolis–Hastings sampler
   (1024 chains, proposal covariance set to the fit Hessian, effective-sample-size
   stopping) runs directly on the emulated likelihood; contours are rendered with
@@ -83,15 +88,18 @@ CosmoML/
 - **w₀wₐCDM**: without the CMB prior all three SN samples (Pantheon+, DES-2024,
   DES-2025) combined with BAO prefer dynamical dark energy (w₀ > −1, wₐ < 0,
   e.g. w₀ = −0.766, wₐ = −0.785 for Pantheon+ & BAO), the same hint reported by
-  DESI. Adding the CMB prior pulls every fit back to ΛCDM (w₀ ≈ −0.96, wₐ ≈ 0.02)
-  and shrinks σ(wₐ) by ~10× (0.42 → 0.045).
+  DESI. Adding the CMB prior moves the fits partway towards ΛCDM but does not
+  reach it: w₀ ≈ −0.78 to −0.86, wₐ ≈ −0.40 to −0.60, with σ(wₐ) halved
+  (0.42 → 0.24) and w₀ still 2.5–3.8σ above −1 across the three SN samples
+  (paper Table 5).
 - **Benchmark** (07): with identical sampler settings, the surrogate completes
   each posterior run in 4.8–7.4 s vs the exact χ² backends — 3.6–22.4× faster
   than vectorized NumPy on CPU and 7.2–12.1× faster than the JAX GPU kernel —
   and all four back-ends give statistically identical posteriors.
 - **SHAP**: the importance ranking follows the expected physics (w₀ above wₐ
-  from low-redshift leverage; background parameters dominate without the CMB
-  prior) and reorganises when the CMB prior is added (w₀, wₐ jump to the top).
+  from low-redshift leverage; background parameters dominate: H0 0.47, Ωm 0.44,
+  w₀ 0.24, wₐ 0.16) and is only reweighted by the CMB prior (Ωm 0.59, H0 0.40,
+  w₀ 0.33, wₐ 0.15): the ordering is preserved, w₀ stays ahead of wₐ.
 
 ## Design principles
 

@@ -378,6 +378,7 @@ def run_mcmc_and_getdist(
         save_path = pathlib.Path(figures_dir) / f"{section}_getdist.png"
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=200, bbox_inches="tight")
+        fig.savefig(Path(save_path).with_suffix(".pdf"), bbox_inches="tight")
         print(f"  Saved: {save_path}")
     if show:
         plt.show()
@@ -458,6 +459,7 @@ def plot_getdist_comparison(
         sp = pathlib.Path(save_path)
         sp.parent.mkdir(parents=True, exist_ok=True)
         g.fig.savefig(sp, dpi=200, bbox_inches="tight")
+        g.fig.savefig(sp.with_suffix(".pdf"), bbox_inches="tight")
         print(f"  Saved: {sp}")
     if show:
         plt.show()
@@ -559,6 +561,7 @@ def plot_corner_marginal(
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=200, bbox_inches="tight")
+        fig.savefig(Path(save_path).with_suffix(".pdf"), bbox_inches="tight")
         print(f"  saved: {save_path}")
 
     if show:

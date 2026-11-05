@@ -1,5 +1,5 @@
 # ── Figuras (regenerables) ────────────────────────────────────────────────
-outputs/figures/**/*.png
+outputs/figures/
 
 # ── Outputs binarios grandes (modelos y chains, regenerables) ────────────
 outputs/models/

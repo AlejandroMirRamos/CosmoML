@@ -16,7 +16,7 @@ import numpy as np
 
 from ..config import (
     C_LIGHT, PLANCK_RD,
-    PLANCK_H0, PLANCK_OM, PLANCK_CMB_W0, PLANCK_CMB_WA,
+    CMB_REF_H0, CMB_REF_OMEGA_M, CMB_REF_W0, CMB_REF_WA,
 )
 from ..priors import _build_cmb_inv_cov
 
@@ -71,10 +71,10 @@ def make_chi2_numpy_fn(panth=None, bao=None,
     # Precompute CMB inverse-covariance and best-fit omega_m once at factory time.
     if planck_prior:
         _cmb_inv_cov  = _build_cmb_inv_cov()
-        _omega_m_bf   = float(PLANCK_OM * (PLANCK_H0 / 100.0) ** 2)
-        _H0_bf        = float(PLANCK_H0)
-        _w0_bf        = float(PLANCK_CMB_W0)
-        _wa_bf        = float(PLANCK_CMB_WA)
+        _omega_m_bf   = float(CMB_REF_OMEGA_M)
+        _H0_bf        = float(CMB_REF_H0)
+        _w0_bf        = float(CMB_REF_W0)
+        _wa_bf        = float(CMB_REF_WA)
 
     def predict_fn(arr: np.ndarray) -> np.ndarray:
         arr = np.asarray(arr, dtype=np.float64)

@@ -25,7 +25,7 @@ except ImportError:
 
 from ..config import (
     C_LIGHT, PLANCK_RD,
-    PLANCK_H0, PLANCK_OM, PLANCK_CMB_W0, PLANCK_CMB_WA,
+    CMB_REF_H0, CMB_REF_OMEGA_M, CMB_REF_W0, CMB_REF_WA,
 )
 from ..priors import _build_cmb_inv_cov
 
@@ -106,10 +106,10 @@ def make_chi2_gpu_fn(panth=None, bao=None,
     if planck_prior:
         _inv_cov_np  = _build_cmb_inv_cov()
         _inv_cov_jax = jnp.array(_inv_cov_np)
-        _H0_bf       = float(PLANCK_H0)
-        _omega_m_bf  = float(PLANCK_OM * (PLANCK_H0 / 100.0) ** 2)
-        _w0_bf       = float(PLANCK_CMB_W0)
-        _wa_bf       = float(PLANCK_CMB_WA)
+        _H0_bf       = float(CMB_REF_H0)
+        _omega_m_bf  = float(CMB_REF_OMEGA_M)
+        _w0_bf       = float(CMB_REF_W0)
+        _wa_bf       = float(CMB_REF_WA)
 
     # ── Core function (scalar params → scalar chi2) ────────────────────────────
     @jax.jit

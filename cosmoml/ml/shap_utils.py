@@ -15,6 +15,22 @@ import shap
 
 from .style import texify, feature_labels
 
+# Paper style for the bar plots: plain blue bars, no row guides, matching the
+# ALP SHAP figure. shap's defaults are crimson bars plus one dashed separator
+# per feature row, which carries no information.
+BAR_COLOR = "C0"
+
+
+def _restyle_bar(ax):
+    """Recolour ``shap.plots.bar`` to the paper blue and drop its row guides."""
+    for line in list(ax.get_lines()):
+        if line.get_color() == "#888888":      # shap's dashed row separators
+            line.remove()
+    for patch in ax.patches:
+        patch.set_color(BAR_COLOR)
+    for txt in ax.texts:                       # the "+0.47" value annotations
+        txt.set_color(BAR_COLOR)
+
 
 def explain(model, X, n_sample: int = 1000, seed: int = 42):
     """Build a TreeExplainer and return (shap_values, X_sampled).
@@ -59,10 +75,12 @@ def shap_summary(
     shap.plots.bar(shap_v, show=False)
     # usetex renders a bare '|' as a dash; wrap the abs-value bars in math mode.
     plt.gca().set_xlabel(r"mean($|$SHAP value$|$)")
+    _restyle_bar(plt.gca())
     plt.tight_layout()
     if save_dir is not None:
         out_bar = save_dir / f"{prefix}_shap_bar.png"
-        plt.savefig(out_bar, dpi=300, bbox_inches="tight"); print(f"  saved: {out_bar}")
+        plt.savefig(out_bar, dpi=300, bbox_inches="tight")
+        plt.savefig(out_bar.with_suffix(".pdf"), bbox_inches="tight"); print(f"  saved: {out_bar} (+pdf)")
     plt.show() if show else plt.close()
 
     return shap_v, X_s
@@ -85,6 +103,7 @@ def shap_waterfall(
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.savefig(Path(save_path).with_suffix(".pdf"), bbox_inches="tight")
         print(f"  saved: {save_path}")
     plt.show() if show else plt.close()
 
@@ -108,6 +127,7 @@ def shap_dependence_all(
         if save_dir is not None:
             out = save_dir / f"{prefix}_shap_{col}.png"
             plt.savefig(out, dpi=300, bbox_inches="tight")
+            plt.savefig(out.with_suffix(".pdf"), bbox_inches="tight")
             print(f"  saved: {out}")
             out_paths.append(out)
         plt.show() if show else plt.close()
@@ -127,5 +147,6 @@ def shap_dependence(
         save_path = Path(save_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.savefig(Path(save_path).with_suffix(".pdf"), bbox_inches="tight")
         print(f"  saved: {save_path}")
     plt.show() if show else plt.close()
